@@ -1,0 +1,6 @@
+using System;using System.Collections.Generic;using System.Diagnostics;using System.Security.Cryptography;using System.Text;using System.Threading;using System.Web.Script.Serialization;using Windows.Foundation;using Windows.Media.Control;
+class MediaReadProbe{
+ static T Wait<T>(IAsyncOperation<T> op){var t=Stopwatch.StartNew();try{while(op.Status==AsyncStatus.Started){if(t.ElapsedMilliseconds>2000)throw new Exception("Probe timeout");Thread.Sleep(20);}return op.GetResults();}finally{op.Close();}}
+ static string Hash(string x){using(var s=SHA256.Create())return BitConverter.ToString(s.ComputeHash(Encoding.UTF8.GetBytes(x))).Replace("-","");}
+ [MTAThread]static int Main(string[] args){try{var manager=Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());var rows=new List<object>();foreach(var s in manager.GetSessions()){var p=Wait(s.TryGetMediaPropertiesAsync());var timeline=s.GetTimelineProperties();rows.Add(new {source=s.SourceAppUserModelId,state=s.GetPlaybackInfo().PlaybackStatus.ToString().ToLowerInvariant(),trackHash=Hash(p.Title+"\n"+p.Artist+"\n"+p.AlbumTitle+"\n"+p.TrackNumber),position=timeline.Position.TotalSeconds,duration=timeline.EndTime.TotalSeconds});}Console.WriteLine(new JavaScriptSerializer().Serialize(rows));return 0;}catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}}
+}

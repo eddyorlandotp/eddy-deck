@@ -1,0 +1,31 @@
+const {chromium}=require('playwright');const fs=require('fs');const path=require('path');const assert=require('assert');
+const root=path.resolve(__dirname,'..');
+(async()=>{
+ const config=JSON.parse(fs.readFileSync(path.join(root,'.build/v2-test-data/test-runtime.json')));const base='http://127.0.0.1:'+config.localPort;
+ const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];const routineName='Prueba visual v2 '+Date.now();
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(token=>sessionStorage.setItem('eddy-token',token),config.localToken);await page.goto(base);await page.getByRole('heading',{name:'Hola, Eddy.'}).waitFor();
+ await page.locator('#side-nav [data-nav=scenes]').click();await page.locator('.heading [data-action=new-scene]').click();
+ await page.locator('#routine-name').fill(routineName);await page.locator('[data-action=add-step]').click();
+ await page.locator('#step-app-search').fill('Opera GX');await page.locator('#step-form [name=monitor]').selectOption('right');await page.locator('#step-form [name=mode]').selectOption('maximized');
+ await page.locator('#step-form [type=submit]').click();assert.equal(await page.locator('.routine-step').count(),1);
+ await page.locator('[data-action=add-step]').click();await page.locator('#step-type').selectOption('wait');await page.locator('#step-form [name=seconds]').fill('2');await page.locator('#step-form [type=submit]').click();
+ await page.locator('[data-action=add-step]').click();await page.locator('#step-type').selectOption('media');await page.locator('#step-form [name=action]').selectOption('next');await page.locator('#step-form [type=submit]').click();
+ assert.equal(await page.locator('.routine-step').count(),3);await page.screenshot({path:path.join(root,'.build/v2-routine-editor.png')});
+ await page.locator('#routine-form [type=submit]').click();await page.locator('#modal').waitFor({state:'hidden'});
+ const saved=await (await page.request.get(base+'/api/state',{headers:{Authorization:'Bearer '+config.localToken}})).json();const routine=saved.profile.scenes.find(s=>s.name===routineName);
+ assert(routine);assert.equal(routine.steps[0].layout.monitor,'right');assert.equal(routine.steps[0].layout.mode,'maximized');assert.equal(routine.steps[2].type,'media');
+ await page.locator(`[data-action=run-scene][data-id="${routine.id}"]`).click();await page.getByText('En cola: '+routineName,{exact:true}).waitFor();
+ await page.locator('#side-nav [data-nav=pc]').click();await page.getByRole('heading',{name:'Tus pantallas'}).waitFor();assert.equal(await page.locator('.monitor-shape').count(),2);await page.screenshot({path:path.join(root,'.build/v2-pc-desktop.png'),fullPage:true});
+ await page.setViewportSize({width:412,height:915});await page.locator('#bottom-nav [data-nav=pc]').click();await page.screenshot({path:path.join(root,'.build/v2-pc-mobile.png'),fullPage:true});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile horizontal overflow');
+ await page.locator('#bottom-nav [data-nav=home]').click();await page.locator('[data-action=edit-card]').first().click();if(!(await page.locator('#card-form [name=monitor]').isVisible()))await page.getByText('Pantalla y tamaño al abrir',{exact:true}).click();await page.locator('#card-form [name=monitor]').selectOption('ask');await page.locator('#card-form [type=submit]').click();await page.locator('#modal').waitFor({state:'hidden'});await page.locator('[data-action=launch-card]').first().click();await page.locator('#launch-layout-form').waitFor();await page.locator('[data-action=close-modal]').click();
+ await page.locator('#bottom-nav [data-nav=music]').click();await page.locator('[data-media=next]').click();assert(!(await page.locator('#modal').isVisible()),'Media must not ask for a screen');
+ await page.locator('#bottom-nav [data-nav=home]').click();
+ const diagnosticDownload=page.waitForEvent('download');await page.locator('[data-action=support-report]').click();const diagnostic=await diagnosticDownload;const diagnosticPath=path.join(root,'.build/beta-support-report.json');await diagnostic.saveAs(diagnosticPath);assert(!fs.readFileSync(diagnosticPath,'utf8').includes(config.localToken));
+ await page.locator('[data-action=repair-pc]').click();await page.locator('[data-action=confirm-repair-pc]').click();await page.locator('#modal').waitFor({state:'hidden'});
+ await page.locator('#bottom-nav [data-nav=music]').click();
+ // Offline actions are blocked, reconnect returns to the same profile.
+ await page.context().setOffline(true);await page.waitForTimeout(4300);await page.locator('[data-media=next]').click();await page.context().setOffline(false);await page.locator('#reconnect-button').click();
+ assert.deepEqual(errors,[]);await browser.close();console.log('PASS: ordered routine editor, persisted layout, simulated execution, two monitors, responsive UI, per-launch prompt, media without prompt, offline/reconnect; no JavaScript errors.');
+})().catch(e=>{console.error(e);process.exit(1)});

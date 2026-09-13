@@ -1,0 +1,13 @@
+const {start,root}=require('./visual_fixture.cjs'),fs=require('fs'),path=require('path'),assert=require('assert'),cp=require('child_process');
+(async()=>{const {browser,p:old,server,snapshot}=await start();const url=old.url();await old.close();const p=await browser.newPage({viewport:{width:360,height:800}}),checks=[],errors=[];
+ const check=(name,okay)=>{assert(okay,name);checks.push(name)};
+ try{snapshot.version='2.2.7-beta.9';
+ await p.addInitScript(({snapshot})=>{window.fakeOnline=false;window.calls=[];window.EddyNative={request(op,json,id){window.calls.push(op);const payload=JSON.parse(json);let result={};if(op==='bootstrap')result={paired:true,pcId:'fixture',pcs:[{id:'fixture',name:'PC de prueba',active:true}]};if(op==='api')result=window.fakeOnline?snapshot:{error:'Esperando a tu PC'};setTimeout(()=>window.eddyResult(id,result),10);}}},{snapshot});
+ p.on('pageerror',e=>errors.push(e.message));await p.goto(url);await p.getByRole('heading',{name:'Reconectando con tu PC.'}).waitFor();
+ check('Offline paired phone keeps its trust and does not request another code',await p.locator('#pair-form').count()===0&&await p.evaluate(()=>bootstrap.paired));
+ await p.locator('[data-action=open-tailscale]').first().click();check('VPN shortcut works while disconnected',await p.evaluate(()=>calls.includes('tailscale')));
+ await p.evaluate(()=>{fakeOnline=true});await p.locator('[data-action=retry-native]').click();await p.getByRole('heading',{name:'Hola, Eddy.'}).waitFor();check('Retry restores saved panel without pairing',await p.evaluate(()=>online&&bootstrap.pcId==='fixture'&&!calls.includes('pair')));
+ await p.evaluate(()=>{sceneEditor('play');document.querySelector('#routine-name').value='Borrador conservado';fakeOnline=false});await p.evaluate(()=>load(true));check('Network loss preserves an open routine draft',await p.locator('#routine-name').inputValue()==='Borrador conservado');
+ await p.evaluate(()=>{fakeOnline=true});await p.evaluate(()=>load(true));check('Reconnection preserves the same routine draft',await p.locator('#routine-name').inputValue()==='Borrador conservado');
+ check('No script errors',errors.length===0);const sourceHashes=JSON.parse(cp.execFileSync(path.join(root,'.build/venv/Scripts/python.exe'),['-c','import json;from scripts.package_evidence import product_sources;print(json.dumps(product_sources()))'],{cwd:root,encoding:'utf8'}));fs.writeFileSync(path.join(root,'artifacts/beta9-offline-ui-tests.json'),JSON.stringify({passed:true,count:checks.length,checks,sourceHashes,scope:'Real UI in Edge; Android bridge and transport are isolated fixtures.'},null,2));
+ }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);process.exitCode=1});
