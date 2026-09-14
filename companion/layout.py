@@ -91,6 +91,9 @@ def _matches(app,processes,window_class=''):
             if window_class not in ('CabinetWClass','ExploreWClass'):continue
             if target=='Microsoft.Windows.Explorer':return True
         if p['aumid'] and p['aumid']==target:return True
+        # Xbox registers a visible desktop launcher and a separate UWP window.
+        # Match this observed pair only, never all apps from the same package.
+        if target=='Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App' and p['aumid']=='Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.AppL' and Path(path).name.lower()=='xboxpcapp.exe':return True
         if not app.get('sharedExecutable') and (path==norm or path==os.path.normcase(app.get('resolvedTarget',''))):return True
         root=app.get('installedRoot')
         if root and app['kind']=='protocol':

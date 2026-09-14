@@ -1,5 +1,7 @@
 # Eddy Deck 2.2.8 · Beta 10
 
+Xbox registra un identificador para abrirse y otro para su ventana. Se añadió la correspondencia exacta, comprobada en su manifiesto instalado, sin asociar otras aplicaciones o widgets de ese paquete.
+
 Si una aplicación bloquea su ventana principal con un aviso o diálogo, Eddy Deck lo señala y conserva esa decisión pendiente. No intenta mover ni cerrar esa ventana desde los controles normales.
 
 Beta 11 unifica todos los selectores, incorpora la descarga verificada de instaladores desde GitHub y corrige fallos de guardado, cancelación y aperturas que pedían permisos. La campaña de pruebas clasifica todo el catálogo y distingue aplicaciones observadas, controles confirmados, permisos, inicio de sesión y casos pendientes. Consulta [el recorrido y sus límites](docs/RECORRIDO-BETA11.md) y [las actualizaciones de GitHub](docs/ACTUALIZACIONES-GITHUB.md).

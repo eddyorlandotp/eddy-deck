@@ -1,5 +1,7 @@
 # Validación · Eddy Deck 2.2.9-beta.11
 
+Xbox registra un identificador para abrirse y otro para su ventana. Se añadió la correspondencia exacta, comprobada en su manifiesto instalado, sin asociar otras aplicaciones o widgets de ese paquete.
+
 Si una aplicación bloquea su ventana principal con un aviso o diálogo, Eddy Deck lo señala y conserva esa decisión pendiente. No intenta mover ni cerrar esa ventana desde los controles normales.
 
 Esta entrega amplía la revisión a los cinco apartados de la interfaz, el catálogo completo de esta PC, rutinas, música, procesos auxiliares, persistencia y actualización desde GitHub. Sigue siendo beta: un conjunto finito de pruebas no demuestra ausencia de errores en todas las aplicaciones o combinaciones.

@@ -8,6 +8,13 @@ from companion import windows
 from test_core import FakeWindows, APP, ROOT
 
 class DailyBeta11(unittest.TestCase):
+    def test_xbox_launcher_matches_only_its_registered_main_window(self):
+        from companion.layout import _matches
+        app={'kind':'shell','name':'XBOX','target':'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.App'}
+        main={'path':r'C:\Program Files\WindowsApps\Microsoft.GamingApp_test\XboxPcApp.exe','aumid':'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.AppL'}
+        self.assertTrue(_matches(app,[main]))
+        for changed in ({'aumid':'Microsoft.GamingApp_8wekyb3d8bbwe!Microsoft.Xbox.WidgetsApp'},{'path':r'C:\Example\other.exe'},{'aumid':'OtherPackage!Microsoft.Xbox.AppL'}):
+            self.assertFalse(_matches(app,[{**main,**changed}]))
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.fake=FakeWindows();self.deck=Deck(self.tmp.name,ROOT,adapter=self.fake);self.deck.apps=[copy.deepcopy(APP)]
     def tearDown(self):self.deck.close();self.tmp.cleanup()

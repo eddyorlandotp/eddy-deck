@@ -1,5 +1,7 @@
 # Recorrido de fiabilidad · beta 11
 
+Xbox registra un identificador para abrirse y otro para su ventana. Se añadió la correspondencia exacta, comprobada en su manifiesto instalado, sin asociar otras aplicaciones o widgets de ese paquete.
+
 La campaña surge de fallos encontrados en usos cotidianos: música, aperturas y dos pasos de rutina. El objetivo es ampliar rutas y verificar efectos visibles, no acumular repeticiones de una sola prueba. Un catálogo descubierto o un proceso existente nunca demuestra funcionamiento completo de una app.
 
 ## Correcciones

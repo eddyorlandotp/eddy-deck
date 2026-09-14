@@ -104,7 +104,7 @@ def validate_beta11(out):
     def report(name):
         try:return json.loads((out/('beta11-'+name+'.json')).read_text(encoding='utf-8-sig'))
         except (OSError,ValueError):raise RuntimeError('Falta un informe válido de beta11: '+name) from None
-    for name,minimum in [('core-tests',242),('visual-tests',55),('pickers-tests',31)]:
+    for name,minimum in [('core-tests',244),('visual-tests',55),('pickers-tests',31)]:
         item=report(name)
         if not item.get('passed') or item.get('testsRun',item.get('count',0))<minimum or item.get('sourceHashes')!=product_sources():raise RuntimeError('Falta regresión actual beta11: '+name)
     updater=report('updater-tests')
@@ -113,7 +113,13 @@ def validate_beta11(out):
     if http.get('failures') or http.get('count',0)<90 or not monitor.get('passed') or monitor.get('topologies',0)<1000:raise RuntimeError('Falta matriz HTTP/monitores.')
     if len(catalog['rows'])!=catalog['catalogCount'] or len({r['id'] for r in catalog['rows']})!=catalog['catalogCount']:raise RuntimeError('Hay entradas del catálogo sin clasificar.')
     phone=report('phone-walkthrough');apk=hashlib.sha256((out/'EddyDeck-Android.apk').read_bytes()).hexdigest()
-    if not phone.get('passed') or phone.get('installedApkSHA256')!=apk or not phone.get('profilePreserved'):raise RuntimeError('Falta recorrido físico del Samsung actual.')
+    equivalent=phone.get('finalBuildEquivalence',{})
+    current_ui=phone.get('installedApkSHA256')==apk or (equivalent.get('passed') and equivalent.get('sameAndroidCodeResourcesAndUI') and equivalent.get('testedApkSHA256')==phone.get('installedApkSHA256') and equivalent.get('finalApkSHA256')==apk)
+    final_phone=report('phone-launch-tests')
+    if not phone.get('passed') or not current_ui or not phone.get('profilePreserved') or not final_phone.get('passed') or final_phone.get('installedApkSHA256')!=apk:raise RuntimeError('Falta recorrido físico del Samsung actual o equivalencia verificable de su interfaz.')
+    media=report('media-audit-live');phone_media=report('phone-visible-tests')
+    if not media.get('passed') or media.get('count',0)<21 or media.get('sourceHashes')!=product_sources():raise RuntimeError('Falta prueba real de los tres reproductores.')
+    if not phone_media.get('passed') or phone_media.get('installedApkSHA256')!=apk or not all(phone_media.get(k) for k in ('tidalPaused','aimpPaused','mediaPlayerPaused','helpersMatch','exportsVerified')):raise RuntimeError('Faltan controles físicos de música del Samsung.')
     android=report('android-installed-tests');release=report('release-verification')
     if not android.get('passed') or android.get('installedVersion')!=VERSION or android.get('basicAssertions',0)<63 or android.get('checks',0)<24:raise RuntimeError('Falta regresión Android instalada.')
     if release.get('version')!=VERSION or not all(release.get(k) for k in ('releaseVerified','installedIntegrityVerified','profileAndPairingPreserved','phoneReconnectedAfterUpdate')):raise RuntimeError('Falta instalación beta11 verificada.')
