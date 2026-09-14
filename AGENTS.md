@@ -6,4 +6,4 @@ En pruebas reales, cerrar solo ventanas creadas por la propia prueba. Conservar 
 
 Para nuevas entregas de producto: incrementar versión, actualizar README y docs/VALIDACION.md, ejecutar las pruebas pertinentes y compilar Windows antes de Android (el APK lleva el instalador Windows). Empaquetar con scripts/package_release.py. No reemplazar una versión entregada por binarios distintos.
 
-No publicar private/, claves, tokens, datos de vinculación, informes personales ni destinos privados de respaldo. Esta copia pública está separada de los paquetes privados de su propietario. Ver docs/PUBLICACION.md.
+No publicar private/, claves, tokens, datos de vinculación, informes personales ni destinos privados de respaldo. GitHub Releases contiene los instaladores oficiales; los perfiles y respaldos del propietario siguen siendo privados. Ver docs/PUBLICACION.md.

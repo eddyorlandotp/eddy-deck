@@ -2,13 +2,14 @@
 import json,re,subprocess,sys,threading,time
 from pathlib import Path
 from companion.windows import HIDDEN
+from companion.child_lifetime import run_owned
 _lock=threading.RLock();_cached=None;_until=0
 def valid_target(value):return isinstance(value,str) and re.fullmatch(r'session:[0-9a-f]{32}',value) is not None
 def invoke(action,target=''):
     if action not in ('list','status','play','pause','toggle','stop','next','previous') or (action!='list' and not valid_target(target)):raise ValueError('Sesión multimedia no válida.')
     helper=Path(sys.executable).parent/'EddyDeck-Media.exe' if getattr(sys,'frozen',False) else Path(__file__).resolve().parents[1]/'.build/EddyDeck-Media.exe'
     if not helper.is_file():raise RuntimeError('Falta el controlador multimedia. Repara los archivos de Eddy Deck en Windows.')
-    try:r=subprocess.run([str(helper),action,target],capture_output=True,text=True,encoding='utf-8-sig',creationflags=HIDDEN,timeout=10)
+    try:r=run_owned([str(helper),action,target],capture_output=True,text=True,encoding='utf-8-sig',creationflags=HIDDEN,timeout=10)
     except subprocess.TimeoutExpired:raise RuntimeError('El reproductor tardó demasiado. No se repitió la orden; comprueba su estado.') from None
     try:result=json.loads(r.stdout)
     except (ValueError,TypeError):raise RuntimeError('El controlador multimedia devolvió una respuesta ilegible.') from None

@@ -1,28 +1,17 @@
-# Publicación del código
+# Publicación · Eddy Deck 2.2.9-beta.11
 
-Esta instantánea pública parte del código de Eddy Deck 2.2.8-beta.10. Incluye la licencia MIT del código propio y la información de dependencias. No contiene claves de firma, datos de vinculación, perfiles privados, informes crudos del dispositivo ni instaladores personales.
+GitHub Releases distribuye los instaladores oficiales de esta beta: Windows, Android y el manifiesto de descarga firmado. El comprobador usa ese origen; no necesita acceso a una cuenta ni al respaldo privado de Drive. Solo descarga entregas completas y verifica su contenido antes de ofrecer instalarlo.
 
-## Cambios exclusivos de esta copia
+Las fuentes públicas contienen el mismo comportamiento de producto. Los identificadores de USB y rutas personales de scripts de pruebas se sustituyen por ejemplos y los saltos de línea se normalizan. Los instaladores firmados publicados son los mismos verificados para esta entrega. No contienen perfiles, vinculación, claves privadas ni enlaces al Drive personal.
 
-- Los enlaces al respaldo personal se sustituyeron por `https://drive.google.com/drive/my-drive`. Ese destino abre el Drive de quien inicia sesión; no descarga ni actualiza Eddy Deck automáticamente.
-- Los identificadores USB y rutas personales se sustituyeron por ejemplos. Los scripts que contienen `ANDROID_SERIAL_HERE` requieren adaptación explícita al dispositivo de pruebas.
-- Se normalizaron los archivos de texto a UTF-8 y saltos de línea LF.
-- La documentación histórica resume pruebas de la versión privada; no acredita pruebas realizadas en otros dispositivos. No se incluyen sus informes originales porque pueden contener datos locales.
+Los informes del dispositivo y la copia original de fuentes se conservan en el respaldo privado. VALIDACION.md distingue controles reales, simulaciones y pendientes. Esta publicación no convierte resultados de esta PC en una certificación de otras computadoras.
 
-La aplicación instalada y los paquetes privados de la versión base permanecen sin cambios. Esta publicación de fuentes no es una actualización del producto instalado ni una promesa de compatibilidad universal.
+## Compilar
 
-## Compilar una distribución propia
+Sigue README y ENTORNO-COMPILACION.md: prepara Python, ejecuta las pruebas, compila Windows antes de Android y después empaqueta. El APK lleva el instalador de Windows y el manual. Las pruebas físicas requieren revisar su alcance, configurar el dispositivo y conservar las sesiones existentes.
 
-Sigue README y ENTORNO-COMPILACION.md. Crea un entorno Python e instala requirements.txt; prepara las herramientas oficiales con scripts/setup_toolchain.py. Ejecuta las pruebas unitarias, luego compila Windows, Android y finalmente el paquete. Algunas herramientas se descargan durante la preparación.
+Las claves de firma no se distribuyen. Una compilación que genere claves propias tendrá una identidad Android diferente y no actualizará la app oficial sobre sus datos. Su verificación también tendrá otra clave: para distribuir un fork configura su propio repositorio y canal de firmas de forma coherente. No desinstales una instalación con datos para saltarte una incompatibilidad de firma.
 
-Las claves privadas no se distribuyen. Los scripts de compilación generan las propias cuando faltan; conserva esas claves fuera de Git. Una firma Android nueva no puede actualizar la instalación privada existente manteniendo su identidad de firma. No reemplaces las claves originales ni desinstales una app con datos sin un respaldo. La clave pública de verificación incluida no permite firmar paquetes.
+El archivo EddyDeck-update.json fija versión, tamaño, hash y URL; EddyDeck-update.sig lo firma. Los archivos internos tienen otra verificación firmada. Copiar ambos archivos sin la clave privada no permite crear una actualización válida. Las versiones antiguas permanecen disponibles y no se sobrescriben con otros binarios.
 
-Configura el destino de tus respaldos de manera coherente antes de generar una nueva distribución: companion/integrity.py, installer/Compatibility.cs, android/src/com/eddy/deck/MainActivity.java, ui/beta2.js, scripts/publish_desktop.py y la documentación. scripts/build_manual.py regenera el manual incorporado. Cada distribución modificada necesita su propia versión, compilación y validación.
-
-## Pruebas y límites
-
-`python -m unittest discover -s tests -v` ejecuta los archivos test_*.py con fixtures y directorios temporales. Los scripts de pruebas reales tienen nombres independientes: inspecciónalos y configúralos antes de ejecutarlos; algunos abren aplicaciones, cambian el volumen o interrumpen redes en el equipo de prueba. No son una prueba automática segura para cualquier equipo sin preparación.
-
-La versión base pasó 224 pruebas Python, 15 comprobaciones de la opción de primer plano en la interfaz, 55 regresiones visuales y diez casos Windows reales con Roblox/TIDAL. Esta copia pública pasó también las 224 pruebas Python (15.812 segundos). Los informes privados de instalación conservan las pruebas adicionales del Samsung. No se compilaron instaladores para esta distribución pública; los resultados Android/Windows pertenecen a la distribución privada indicada, no a un binario público nuevo.
-
-Siguen pendientes: datos móviles reales/otra red, un reinicio completo de Windows y otras computadoras. Tailscale requiere conexión y cuenta en ambos dispositivos; el código no garantiza despertar remoto, superar bloqueos de red ni disponibilidad de terceros.
+El canal personal incluye las betas publicadas. La versión final, con el mismo número principal, tiene precedencia sobre sus prereleases. No se instala una actualización sin la acción explícita en el comprobador. Consulta ACTUALIZACIONES-GITHUB.md para límites de red, arquitectura y recuperación.

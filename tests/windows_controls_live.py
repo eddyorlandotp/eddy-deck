@@ -29,6 +29,14 @@ def main():
   while len(rows())!=2 and time.monotonic()<until:time.sleep(.1)
   found=rows();record('Two owned fixture windows identified',len(found)==2)
   normal=next(w for w in found if w['title'].endswith('normal'));guard=next(w for w in found if w['title'].endswith('pendiente'))
+  import win32gui
+  hwnd=layout.leases[normal['id']]['hwnd'];win32gui.EnableWindow(hwnd,False)
+  try:
+   record('A disabled parent window is identified as needing attention',next(w for w in rows() if w['id']==normal['id'])['needsAttention'])
+   rejects('Moving a parent blocked by a dialog is rejected',lambda:layout.move(normal['id'],{'mode':'minimized'},[app]))
+   rejects('Closing a parent blocked by a dialog is rejected',lambda:layout.close_window(normal['id'],[app]))
+   record('Opening an app with a disabled parent reports attention without dismissing its dialog',layout.present(normal['id'],{'monitor':'keep','mode':'keep'},[app],lambda:None)['status']=='needs_attention')
+  finally:win32gui.EnableWindow(hwnd,True)
   layout.protect(normal['id'],True,[app])
   rejects('Protected normal close rejected',lambda:layout.close_window(normal['id'],[app]))
   rejects('Protected termination rejected',lambda:layout.terminate_window(normal['id'],[app]))
@@ -40,14 +48,14 @@ def main():
   with tempfile.TemporaryDirectory() as tmp:
    deck=Deck(tmp,ROOT,adapter=windows);deck.apps=[app];deck.layouts=layout
    try:
-    job=deck.dispatch('/api/launch',{'requestId':'reuse-fixture','appId':'fixture'},'local');done=wait_job(deck,job['jobId']);record('Already-open launch reuses existing windows',done['results'][0]['status']=='already_open' and len(rows())==2)
+    job=deck.dispatch('/api/launch',{'requestId':'reuse-fixture','appId':'fixture','activation':'windows'},'local');done=wait_job(deck,job['jobId']);record('Already-open launch reuses existing windows',done['results'][0]['status']=='already_open' and len(rows())==2)
     record('WM_CLOSE closes only normal fixture',layout.close_window(normal['id'],[app])['status']=='closed_or_hidden' and len(rows())==1)
     rejects('Stale closed window identity rejected',lambda:layout.move(normal['id'],{'mode':'minimized'},[app]))
     import win32gui
     bounds=win32gui.GetWindowRect(layout.leases[guard['id']]['hwnd'])
     layout.move(guard['id'],{'monitor':'keep','mode':'minimized'},[app])
     job=deck.dispatch('/api/launch',{'requestId':'restore-existing-fixture','appId':'fixture'},'local');done=wait_job(deck,job['jobId'])
-    record('Opening a unique minimized app restores it',done['results'][0]['status']=='restored')
+    record('Opening a unique minimized app restores it',not win32gui.IsIconic(layout.leases[guard['id']]['hwnd']))
     record('Restore preserves previous geometry',win32gui.GetWindowRect(layout.leases[guard['id']]['hwnd'])==bounds)
     closed=layout.close_window(guard['id'],[app]);print(json.dumps({'closeResult':closed,'remainingFixtures':rows(),'exitCode':p.poll()},ensure_ascii=False))
     record('Unsaved fixture refuses normal close',closed['status']=='needs_attention' and p.poll() is None)

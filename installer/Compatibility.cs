@@ -8,15 +8,17 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
 class Compatibility : Form {
     const string VersionName="@@VERSION@@",Modulus="@@MODULUS@@";
-    const string DriveUrl="https://drive.google.com/drive/my-drive";
+    CancellationTokenSource downloadCancel; bool downloading, closingDownload; string downloadedSource;
     static string Data=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".eddydeck");
     static string Installed=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","EddyDeck");
+    static string DownloadRoot=Path.Combine(Data,"update-staging");
     static JavaScriptSerializer Json=new JavaScriptSerializer {MaxJsonLength=2000000};
     string source=AppDomain.CurrentDomain.BaseDirectory;TextBox status=new TextBox();
     Dictionary<string,object> last;
@@ -100,7 +102,23 @@ class Compatibility : Form {
         // A supervisor stopped after its worker may have briefly replaced it.
         foreach(var p in Process.GetProcessesByName("EddyDeck"))using(p){try{if(String.Equals(p.MainModule.FileName,expected,StringComparison.OrdinalIgnoreCase))throw new Exception("Eddy Deck sigue activo. Sal desde su icono y vuelve a intentarlo.");}catch(InvalidOperationException){}}
     }
+    static void WaitOwned(Process child,int milliseconds,string message){
+        if(child.WaitForExit(milliseconds))return;
+        // This handle belongs to the child started by this checker, not an app
+        // found by name. Never leave profile validation or an installer orphaned.
+        try{child.Kill();}catch(InvalidOperationException){}
+        if(!child.WaitForExit(10000))throw new Exception("El proceso de instalación no terminó. No repitas la operación; revisa su informe.");
+        throw new Exception(message);
+    }
     static void Install(string folder,string profile=null){
+        using(var gate=new Mutex(false,"Local\\EddyDeck-Installation")){
+            bool held=false;try{try{held=gate.WaitOne(0);}catch(AbandonedMutexException){held=true;}
+                if(!held)throw new Exception("Otra instalación de Eddy Deck está trabajando. Espera a que termine.");
+                InstallCore(folder,profile);
+            }finally{if(held)gate.ReleaseMutex();}
+        }
+    }
+    static void InstallCore(string folder,string profile=null){
         var report=SystemReport();
         try{
             if(!(bool)report["windows11Compatible"])throw new Exception("Este paquete necesita Windows 11 de 64 bits. No se instaló nada.");
@@ -111,9 +129,7 @@ class Compatibility : Form {
                 Dictionary<string,object> current=null;
                 try{current=Header(File.ReadAllBytes(currentManifest),File.ReadAllText(currentSignature));}catch{report["previousManifestDamaged"]=true;}
                 if(current!=null){
-                    var incoming=new Version(Convert.ToString(m["version"]).Split('-')[0]);
-                    var existing=new Version(Convert.ToString(current["version"]).Split('-')[0]);
-                    if(incoming<existing)throw new Exception("Ya tienes una versión más reciente. Elige su paquete en Drive para reparar sin retroceder de versión.");
+                    if(GitHubUpdate.Compare(Convert.ToString(m["version"]),Convert.ToString(current["version"]))<0)throw new Exception("Ya tienes una versión más reciente. Busca su paquete en GitHub para reparar sin retroceder de versión.");
                 }
             }
             long total=((Dictionary<string,object>)m["files"]).Values.Sum(v=>Convert.ToInt64(((Dictionary<string,object>)v)["size"]));
@@ -122,11 +138,11 @@ class Compatibility : Form {
             if(profile!=null){
                 // Validate with the verified runtime before stopping the receiver.
                 var validation=new ProcessStartInfo(Path.Combine(folder,"EddyDeck.exe"),"--validate-profile \""+profile+"\""){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=folder};
-                using(var p=Process.Start(validation)){if(!p.WaitForExit(20000)||p.ExitCode!=0)throw new Exception("La copia de botones y rutinas no es válida. Elige el JSON exportado por Eddy Deck. No se sustituyó el panel.");}
+                using(var p=Process.Start(validation)){WaitOwned(p,20000,"La comprobación del panel tardó demasiado y se detuvo. No se sustituyó el panel.");if(p.ExitCode!=0)throw new Exception("La copia de botones y rutinas no es válida. Elige el JSON exportado por Eddy Deck. No se sustituyó el panel.");}
             }
             StopInstalled();
             var start=new ProcessStartInfo(Path.Combine(folder,"EddyDeck.exe"),"--install-silent"+(profile==null?"":" --restore-profile \""+profile+"\"")){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=folder};
-            using(var p=Process.Start(start)){if(!p.WaitForExit(90000))throw new Exception("La instalación sigue ocupada. Espera y revisa Eddy Deck antes de volver a intentarlo.");if(p.ExitCode!=0)throw new Exception("La instalación no pudo terminar. Revisa el informe y el espacio disponible; conserva la copia anterior.");}
+            using(var p=Process.Start(start)){WaitOwned(p,300000,"La instalación superó cinco minutos y se detuvo. Revisa su informe y conserva la copia anterior para recuperar.");if(p.ExitCode!=0)throw new Exception("La instalación no pudo terminar. Revisa el informe y el espacio disponible; conserva la copia anterior.");}
             report["installed"]=true;report["profileRestored"]=profile!=null;SaveReport(report);
             string staging=Path.Combine(Data,"repair-staging");Guid stagingId;
             if(Confined(staging,folder)&&Path.GetDirectoryName(Path.GetFullPath(folder))==staging&&Guid.TryParse(Path.GetFileName(folder),out stagingId)){
@@ -139,7 +155,7 @@ class Compatibility : Form {
         if(repair)source="";
         var panel=new FlowLayoutPanel{Dock=DockStyle.Top,Height=145,Padding=new Padding(12),AutoScroll=true};
         status.Multiline=true;status.ReadOnly=true;status.ScrollBars=ScrollBars.Vertical;status.Dock=DockStyle.Fill;status.Font=new System.Drawing.Font("Segoe UI",11);status.Padding=new Padding(12);
-        Action<string,Action> button=(name,action)=>{var b=new Button{Text=name,AutoSize=true,Height=38,Margin=new Padding(4)};b.Click+=(s,e)=>{try{action();}catch(Exception ex){status.Text=ex.Message+"\r\n\r\nAbre el respaldo en Drive o elige otra copia del celular.";}};panel.Controls.Add(b);};
+        Action<string,Action> button=(name,action)=>{var b=new Button{Text=name,AutoSize=true,Height=38,Margin=new Padding(4)};b.Click+=(s,e)=>{try{if(downloading){status.Text="Hay una descarga en curso. Espera o cancélala.";return;}action();}catch(Exception ex){status.Text=ex.Message+"\r\n\r\nBusca la versión en GitHub o elige otra copia del celular.";}};panel.Controls.Add(b);};
         button("Comprobar este paquete",()=>Check());
         button("Elegir carpeta descargada",()=>{using(var d=new FolderBrowserDialog{Description="Carpeta donde extrajiste todo el ZIP de Eddy Deck"})if(d.ShowDialog()==DialogResult.OK){source=d.SelectedPath;Check();}});
         button("Instalar / reparar",()=>{
@@ -147,7 +163,10 @@ class Compatibility : Form {
             if(String.IsNullOrEmpty(source))source=CachedSource();
             Install(source);status.Text="Eddy Deck instalado y abierto. En el celular puedes conectar con el código de esta PC. Se guardó el informe de instalación.";
         });
-        button("Abrir respaldo privado en Drive",()=>Process.Start(new ProcessStartInfo(DriveUrl){UseShellExecute=true}));
+        button("Buscar y descargar de GitHub",()=>Download());
+        button("Abrir versiones en GitHub",()=>Process.Start(new ProcessStartInfo(GitHubUpdate.ReleasesUrl){UseShellExecute=true}));
+        var cancel=new Button{Text="Cancelar descarga",AutoSize=true,Margin=new Padding(4)};cancel.Click+=(s,e)=>{if(downloadCancel!=null)downloadCancel.Cancel();};panel.Controls.Add(cancel);
+        FormClosing+=(s,e)=>{if(downloading){e.Cancel=true;closingDownload=true;downloadCancel.Cancel();status.Text="Cancelando la descarga antes de cerrar…";}else CleanupDownload();};
         button("Restaurar botones y rutinas…",()=>{
             using(var d=new OpenFileDialog{Filter="Copia de Eddy Deck|*.json",CheckFileExists=true}){
                 if(d.ShowDialog()!=DialogResult.OK)return;
@@ -158,6 +177,23 @@ class Compatibility : Form {
         button("Guardar informe",()=>{if(last==null)last=SystemReport();using(var d=new SaveFileDialog{Filter="Informe JSON|*.json",FileName="EddyDeck-compatibilidad.json"})if(d.ShowDialog()==DialogResult.OK)SaveReport(last,d.FileName);});
         Controls.Add(status);Controls.Add(panel);Shown+=(s,e)=>Check();
     }
+    void CleanupDownload(){if(downloadedSource!=null){GitHubUpdate.Clean(Path.GetDirectoryName(downloadedSource),DownloadRoot);downloadedSource=null;}}
+    string CurrentVersion(){
+        string path=Path.Combine(Installed,"release-manifest.json");
+        if(File.Exists(path)){try{var current=Header(File.ReadAllBytes(path),File.ReadAllText(Path.Combine(Installed,"release-manifest.sig")));string v=Convert.ToString(current["version"]);if(GitHubUpdate.Compare(v,VersionName)>0)return v;}catch{}}
+        return VersionName;
+    }
+    async void Download(){
+        if(downloading)return;downloading=true;downloadCancel=new CancellationTokenSource();downloadCancel.CancelAfter(300000);
+        var token=downloadCancel.Token;string current=CurrentVersion();int build=Convert.ToInt32(SystemReport()["windowsBuild"]);
+        Action<string> progress=text=>{if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(!IsDisposed)status.Text=text;}));};
+        try{
+            string result=await Task.Run(()=>GitHubUpdate.Prepare(current,build,Modulus,DownloadRoot,token,progress,Verify));
+            CleanupDownload();downloadedSource=result;source=result;Check();status.AppendText("\r\n\r\nDescarga verificada. Pulsa Instalar / reparar para aplicar esta versión.");
+        }catch(OperationCanceledException){status.Text="Descarga cancelada. Tu instalación se conserva.";}
+        catch(Exception ex){status.Text="No se pudo preparar la actualización: "+ex.Message;SaveReport(new Dictionary<string,object>{{"operation","github-update"},{"error",ex.Message}});}
+        finally{downloading=false;downloadCancel.Dispose();downloadCancel=null;if(closingDownload)Close();}
+    }
     void Check(){
         last=SystemReport();var sb=new StringBuilder("Comprobador Eddy Deck "+VersionName+"\r\n\r\n");
         sb.AppendLine("Windows: compilación "+last["windowsBuild"]+" · "+last["architecture"]);
@@ -166,11 +202,17 @@ class Compatibility : Form {
         if((bool)last["armEmulationWarning"])sb.AppendLine("Windows ARM: requiere emulación x64. No se ha probado físicamente en ARM.");
         try{if(String.IsNullOrEmpty(source)){sb.AppendLine("Reparación desde la copia local verificada. Pulsa Instalar / reparar.");}else{var m=Verify(source);last["integrityVerified"]=true;last["packageVersion"]=m["version"];sb.AppendLine("Paquete "+m["version"]+": firma y todos sus archivos correctos.");}}
         catch(Exception e){last["integrityVerified"]=false;last["error"]=e.Message;sb.AppendLine("No se debe instalar esta copia: "+e.Message);}
-        sb.AppendLine("\r\nEl paquete incluye Python y sus bibliotecas. No descarga ni ejecuta dependencias desconocidas. Drive es privado: se abre en el navegador para que descargues con tu cuenta. Después, elige la carpeta extraída y se comprobará su firma.");
+        sb.AppendLine("\r\nEl paquete incluye Python y sus bibliotecas. GitHub ofrece las versiones públicas sin iniciar sesión. Buscar y descargar comprueba la firma, versión, tamaño y archivos antes de ofrecer la instalación. También puedes elegir una copia extraída del celular. Drive se conserva como respaldo privado separado.");
         status.Text=sb.ToString();SaveReport(last);
     }
     [STAThread] static int Main(string[] args){
         try{
+            if(args.Length==2&&args[0]=="--download-release"){
+                var report=SystemReport();using(var cancel=new CancellationTokenSource(300000)){
+                    try{string folder=GitHubUpdate.Prepare(VersionName,Convert.ToInt32(report["windowsBuild"]),Modulus,DownloadRoot,cancel.Token,x=>{},Verify);report["downloadVerified"]=true;report["source"]=folder;SaveReport(report,args[1]);return 0;}
+                    catch(Exception ex){report["downloadVerified"]=false;report["error"]=ex.Message;SaveReport(report,args[1]);return 2;}
+                }
+            }
             if(args.Length==3&&args[0]=="--check"){
                 var report=SystemReport();try{var m=Verify(args[1]);report["integrityVerified"]=true;report["packageVersion"]=m["version"];}catch(Exception e){report["integrityVerified"]=false;report["error"]=e.Message;}
                 SaveReport(report,args[2]);return (bool)report["integrityVerified"]?0:2;

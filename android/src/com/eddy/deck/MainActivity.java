@@ -341,7 +341,7 @@ public class MainActivity extends Activity {
             }
             case "batterySettings":runOnUiThread(()->{Intent i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()));startActivity(i);});return new JSONObject();
             case "tailscale":runOnUiThread(()->{Intent i=getPackageManager().getLaunchIntentForPackage("com.tailscale.ipn");if(i==null)i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn"));startActivity(i);});return new JSONObject();
-            case "openBackup":runOnUiThread(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://drive.google.com/drive/my-drive"))));return new JSONObject();
+            case "openBackup":runOnUiThread(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/eddyorlandotp/eddy-deck/releases"))));return new JSONObject();
             case "exportDocumentation":runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/zip");i.putExtra(Intent.EXTRA_TITLE,versionedFile("EddyDeck-Documentacion",".zip"));openPicker(i,15);});return new JSONObject().put("choosing",true);
             case "exportInstaller":runOnUiThread(()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/zip");i.putExtra(Intent.EXTRA_TITLE,versionedFile("EddyDeck-Windows",".zip"));openPicker(i,13);});return new JSONObject().put("choosing",true);
             case "haptic":runOnUiThread(()->web.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS));return new JSONObject();

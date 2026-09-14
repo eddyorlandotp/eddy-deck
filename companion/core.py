@@ -13,7 +13,7 @@ from companion.layout import Windows, monitors, validate_layout, resolve_monitor
 from companion.jobs import Journal, Queue, ReceiptError
 from companion.network import interface_addresses
 
-VERSION='2.2.8-beta.10'
+VERSION='2.2.9-beta.11'
 PORT=47990
 LOCAL_PORT=47989
 DISCOVERY_PORT=47991
@@ -273,11 +273,7 @@ class Deck:
             return {'type':'wait','seconds':seconds}
         if kind=='media':
             target=step.get('target','system');action=step.get('action')
-            allowed={'tidal':{'play','pause','toggle','stop','next','previous','mute'},'system':{'previous','next','play','pause','toggle','stop','volume_up','volume_down','mute'},'aimp':{'previous','next','play','pause','toggle','stop','mute'}}
-            from companion.media_sessions import valid_target
-            allowed['windows']={'previous','next','toggle','stop','volume_up','volume_down','mute'}
-            if valid_target(target):allowed[target]={'play','pause','toggle','stop','next','previous'}
-            if target not in allowed or action not in allowed[target]:raise ValueError('Control de música no válido.')
+            windows.validate_media_action(action,target,routine=True)
             return {'type':'media','target':target,'action':action}
         if kind not in ('launch','window'):raise ValueError('Tipo de paso no permitido.')
         aid=clean_text(step.get('appId',''),64);url=windows.validate_url(step.get('url',''))
@@ -331,7 +327,10 @@ class Deck:
             return {'status':'completed','message':'Espera completada'}
         if self.dry_run:return {'status':'simulated','message':'Paso validado sin modificar Windows.'}
         if kind=='media':
-            with self.media_lock:check();return self.adapter.media(step['action'],step['target'],self.apps)
+            # Waiting for a direct music control must remain cancellable too.
+            while not self.media_lock.acquire(timeout=.1):check()
+            try:check();return self.adapter.media(step['action'],step['target'],self.apps)
+            finally:self.media_lock.release()
         if kind=='windowId':return self.layouts.move(step['windowId'],step['layout'],self.apps,check)
         if kind=='windowClose':return self.layouts.close_window(step['windowId'],self.apps,check)
         if kind=='windowRestore':return self.layouts.restore(step['windowId'],self.apps,check)
@@ -356,6 +355,16 @@ class Deck:
         return self.layouts.launch(app,step['url'],settings,self.apps,check)
 
     def _dispatch(self,path,body,device):
+        if path in ('/api/cards/save','/api/cards/delete','/api/cards/move','/api/scenes/save','/api/scenes/delete','/api/backup/import'):
+            # Failed validation/disk writes cannot leave invisible edits in
+            # memory which a later successful save accidentally persists.
+            with self.lock:
+                previous=copy.deepcopy(self.profile)
+                try:return self._dispatch_inner(path,body,device)
+                except Exception:self.profile=previous;raise
+        return self._dispatch_inner(path,body,device)
+
+    def _dispatch_inner(self,path,body,device):
         with self.lock:
             if self.closed:raise APIError(503,'Eddy Deck se está cerrando. Espera a que vuelva la conexión.')
         if self.repairing and path not in ('/api/diagnostics','/api/repair','/api/jobs/cancel'):
@@ -456,8 +465,13 @@ class Deck:
             from companion.desktop import configure_startup
             configure_startup(body['enabled']);return {'status':'saved'}
         if path=='/api/media':
+            windows.validate_media_action(body.get('action'),body.get('target','system'),body.get('value'))
             if self.dry_run: return {'status':'simulated','message':'Control simulado'}
-            with self.media_lock:return self.adapter.media(body.get('action'),body.get('target','system'),self.apps,body.get('value'))
+            if not self.media_lock.acquire(timeout=2):raise APIError(409,'Otro control de música sigue en curso. Espera su resultado antes de repetirlo.')
+            try:
+                if self.closed or self.repairing:raise APIError(409,'Eddy Deck está reiniciando. No se envió el control de música.')
+                return self.adapter.media(body.get('action'),body.get('target','system'),self.apps,body.get('value'))
+            finally:self.media_lock.release()
         if path=='/api/cards/save':
             app=self.find_app(body.get('appId'))
             name=clean_text(body.get('name',app['name']))

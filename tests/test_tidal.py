@@ -47,14 +47,14 @@ class TidalTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):tidal.control('play',[])
         self.assertIsNone(tidal._cached);self.assertEqual(tidal._until,0)
     def test_missing_tidal_does_not_run_a_helper(self):
-        with patch('companion.tidal.target',return_value=None),patch('companion.tidal.subprocess.run') as run:
+        with patch('companion.tidal.target',return_value=None),patch('companion.tidal.run_owned') as run:
             with self.assertRaises(ValueError):tidal.invoke('pause',[])
         run.assert_not_called()
     def test_helper_timeout_and_invalid_json_never_report_success_or_retry(self):
         lease={'hwnd':1,'process':{'pid':2,'created':3,'path':'C:/fixture/TIDAL.exe'}}
         failures=[subprocess.TimeoutExpired('fixture',8),subprocess.CompletedProcess([],0,'[]'),subprocess.CompletedProcess([],0,'{"state":"unknown"}'),subprocess.CompletedProcess([],0,'bad json')]
         for failure in failures:
-            with self.subTest(failure=str(failure)),patch('companion.tidal.target',return_value=lease),patch('companion.tidal.Path.is_file',return_value=True),patch('companion.tidal.subprocess.run',side_effect=failure if isinstance(failure,Exception) else None,return_value=failure) as run:
+            with self.subTest(failure=str(failure)),patch('companion.tidal.target',return_value=lease),patch('companion.tidal.Path.is_file',return_value=True),patch('companion.tidal.run_owned',side_effect=failure if isinstance(failure,Exception) else None,return_value=failure) as run:
                 with self.assertRaises(RuntimeError):tidal.invoke('pause',[])
                 self.assertEqual(run.call_count,1)
 

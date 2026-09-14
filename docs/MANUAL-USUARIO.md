@@ -1,5 +1,18 @@
 # Eddy Deck · Manual de usuario
 
+Si una aplicación bloquea su ventana principal con un aviso o diálogo, Eddy Deck lo señala y conserva esa decisión pendiente. No intenta mover ni cerrar esa ventana desde los controles normales.
+
+## Actualizaciones, menús y fiabilidad · beta 11
+
+- Todos los selectores, incluido **Reproductor** en Música, usan el mismo menú. Con muchas opciones aparece búsqueda. Atrás cierra solo las opciones. La actualización automática del estado no interrumpe una elección abierta.
+- **Versiones e instaladores en GitHub** abre las entregas oficiales. En Windows, abre el comprobador y pulsa **Buscar y descargar de GitHub**. Comprueba la firma, versión, tamaño y archivos. Después pulsa **Instalar / reparar**. Puedes cancelar la descarga y seguir usando la versión instalada.
+- El paquete Windows del celular corresponde a la versión de su APK. Si es antiguo, su comprobador puede descargar uno posterior de GitHub. Actualiza también Android usando el APK de esa misma entrega. Windows y Android muestran un aviso si sus versiones difieren.
+- Drive sigue siendo tu respaldo privado adicional; ya no es el destino del botón de actualizaciones. Las claves de firma siguen fuera de todos los paquetes públicos.
+- Si una aplicación requiere administrador, Eddy Deck puede indicarte que la abras manualmente en la PC. No evita permisos ni mantiene bloqueada la cola esperando esa ventana.
+- Cancelar una rutina impide acciones pendientes. Si el paso actual ya envió una orden, no puede deshacerla: se conserva su resultado y la rutina queda cancelada. Una orden directa de música que encuentra ocupado el control durante dos segundos se rechaza con aviso; no queda esperando para ejecutarse mucho después.
+- Si falla guardar un botón o una rutina, la edición fallida no queda oculta en memoria. Si desaparece el reproductor al pausar, la app avisa y no convierte la pausa en una tecla que pueda reproducir otra aplicación.
+
+
 ## Abrir aplicaciones al frente · beta 10
 
 En el menú de un botón, abre **Pantalla y tamaño al abrir → Al abrir la aplicación**. En una rutina, edita un paso **Abrir aplicación** y busca la misma opción.
@@ -209,9 +222,9 @@ Guarda una edición de botones o rutinas antes de reparar o cerrar la app. Los c
 
 **Reparar archivos de Eddy Deck:** usa la copia local verificada, restaura el programa y vuelve a abrirlo. Conserva botones, rutinas y vínculos. Si la PC ya no responde, abre allí el acceso directo **Eddy Deck - Reparar**. Ese comprobador funciona fuera de la carpeta principal del programa y no depende de su Python.
 
-Si tampoco funciona la copia local, abre «Respaldo privado en Drive», descarga el paquete de la versión vigente, extrae todo y selecciona esa carpeta en el comprobador. Drive es privado: debes entrar con tu cuenta en el navegador. No hay una descarga silenciosa ni una actualización automática desde Drive.
+Si tampoco funciona la copia local, usa **Buscar y descargar de GitHub** en el comprobador. Prepara una carpeta verificada y después puedes instalarla. También puedes descargar el ZIP manualmente desde GitHub y elegir su carpeta extraída; no mezcles sus archivos con otra versión.
 
-Si se dañó el archivo de botones o rutinas y el programa no inicia, usa **Restaurar botones y rutinas…** en el comprobador de Windows. Elige una copia JSON que hayas exportado. La comprueba antes de detener el receptor, conserva el archivo anterior y restaura el panel sin cambiar los permisos del celular. Reparar archivos por sí solo no reemplaza una configuración dañada. Si descargas el paquete completo de Drive, el programa está dentro de **EddyDeck/Windows**; también se proporciona el ZIP separado de Windows.
+Si se dañó el archivo de botones o rutinas y el programa no inicia, usa **Restaurar botones y rutinas…** en el comprobador de Windows. Elige una copia JSON que hayas exportado. La comprueba antes de detener el receptor, conserva el archivo anterior y restaura el panel sin cambiar los permisos del celular. Reparar archivos por sí solo no reemplaza una configuración dañada. Si descargas el paquete completo de GitHub o del respaldo privado de Drive, el programa está dentro de **EddyDeck/Windows**; también se proporciona el ZIP separado de Windows.
 
 **Guardar informe:** crea un diagnóstico con versiones, estado y sucesos recientes. Desde Android puede incluir también el informe de Windows si está conectado. No incluye el código de vinculación, claves ni el token de control. Si el disco está lleno o inaccesible, podría no poder guardar un informe.
 

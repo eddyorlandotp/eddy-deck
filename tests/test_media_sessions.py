@@ -50,7 +50,7 @@ class MediaSessionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):windows.media('pause',SID,[])
         key.assert_not_called()
     def test_invalid_session_ids_and_actions_never_start_helper(self):
-        with patch('companion.media_sessions.subprocess.run') as call:
+        with patch('companion.media_sessions.run_owned') as call:
             for target in ('session:../x','session:'+'a'*31,'file:///x',SID+'x',None):
                 with self.assertRaises(ValueError):media_sessions.invoke('pause',target)
             with self.assertRaises(ValueError):media_sessions.invoke('launch',SID)
@@ -61,10 +61,10 @@ class MediaSessionTests(unittest.TestCase):
             with self.assertRaises(ValueError):Deck.clean_step(None,{'type':'media','target':target,'action':action},False)
     def test_malformed_helper_reply_is_an_error(self):
         for reply in ('[]','{}','{"players":[null]}','{"players":[{"id":"bad"}]}'):
-            with patch('companion.media_sessions.Path.is_file',return_value=True),patch('companion.media_sessions.subprocess.run',return_value=subprocess.CompletedProcess([],0,reply)):
+            with patch('companion.media_sessions.Path.is_file',return_value=True),patch('companion.media_sessions.run_owned',return_value=subprocess.CompletedProcess([],0,reply)):
                 with self.assertRaises(RuntimeError):media_sessions.invoke('list')
     def test_timeout_is_not_retried(self):
-        with patch('companion.media_sessions.Path.is_file',return_value=True),patch('companion.media_sessions.subprocess.run',side_effect=subprocess.TimeoutExpired('fixture',10)) as run:
+        with patch('companion.media_sessions.Path.is_file',return_value=True),patch('companion.media_sessions.run_owned',side_effect=subprocess.TimeoutExpired('fixture',10)) as run:
             with self.assertRaises(RuntimeError):media_sessions.invoke('pause',SID)
         self.assertEqual(run.call_count,1)
     def test_cached_snapshot_names_are_resolved_against_current_pc_catalog(self):

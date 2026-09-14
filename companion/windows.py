@@ -145,7 +145,11 @@ def validate_url(value):
         raise ValueError('Usa una dirección http:// o https://, sin contraseñas.') from None
     return value
 
-def launch(app, url=''):
+def launch(app,url='',check=lambda:None):
+    from companion.launch_worker import launch as bounded
+    return bounded(app,url,check)
+
+def launch_inline(app, url=''):
     url = validate_url(url)
     target = app['target']
     if url:
@@ -161,7 +165,21 @@ def launch(app, url=''):
             actual = shortcut_target(app['source'])
             if os.path.normcase(actual) != os.path.normcase(target):
                 raise ValueError('El acceso directo cambió. Sincroniza antes de abrirlo.')
-            os.startfile(app['source'])
+            # CreateProcess preserves the shortcut's arguments/working folder,
+            # but returns ERROR_ELEVATION_REQUIRED instead of opening a UAC
+            # prompt on an unattended PC and blocking ShellExecute indefinitely.
+            import struct
+            with open(app['source'],'rb') as link:header=link.read(76)
+            if len(header)<76 or struct.unpack_from('<I',header)[0]!=76:raise ValueError('Acceso directo incompleto. Sincroniza el catálogo.')
+            if struct.unpack_from('<I',header,20)[0]&0x2000:raise ValueError('Este acceso directo solicita ejecutar como administrador. Ábrelo manualmente en la PC.')
+            import pythoncom,win32com.client
+            pythoncom.CoInitialize()
+            try:
+                link=win32com.client.Dispatch('WScript.Shell').CreateShortcut(app['source'])
+                if os.path.normcase(link.TargetPath)!=os.path.normcase(target) or link.Arguments!=app.get('arguments',''):raise ValueError('El acceso directo cambió. Sincroniza el catálogo.')
+                arguments=link.Arguments;working=link.WorkingDirectory
+            finally:pythoncom.CoUninitialize()
+            subprocess.Popen(subprocess.list2cmdline([target])+(' '+arguments if arguments else ''),executable=target,cwd=working if working and Path(working).is_dir() else str(Path(target).parent),close_fds=True)
         else:
             subprocess.Popen([target], cwd=str(Path(target).parent), close_fds=True)
     elif app['kind'] == 'protocol':
@@ -263,7 +281,22 @@ def media_snapshot(apps,*,fresh=False):
     sessions=media_sessions.snapshot(apps,fresh=fresh);result['players']=sessions['players'];result['sessionError']=sessions.get('error','');result['autoTarget']=preferred_media(result)
     return result
 
+def validate_media_action(action,target,value=None,*,routine=False):
+    from companion.media_sessions import valid_target
+    playback={'play','pause','toggle','stop','next','previous'}
+    allowed={'system':playback|{'volume_up','volume_down','mute'},'windows':{'toggle','stop','next','previous','volume_up','volume_down','mute'},'aimp':playback|{'mute'},'tidal':playback|{'mute'}}
+    if not routine:
+        allowed['aimp'].add('volume');allowed['tidal']|={'volume_up','volume_down'}
+    if valid_target(target):choices=playback
+    elif isinstance(target,str) and target in allowed:choices=allowed[target]
+    else:raise ValueError('Reproductor no válido.')
+    if not isinstance(action,str) or action not in choices:
+        if target=='windows' and action in ('play','pause'):raise ValueError('Las teclas de Windows no pueden confirmar Reproducir o Pausar por separado. Elige el reproductor directamente.')
+        raise ValueError('Este control no está disponible para el reproductor elegido.')
+    if action=='volume' and (type(value) is not int or not 0<=value<=100):raise ValueError('Volumen no válido.')
+
 def media(action, target, apps, value=None):
+    validate_media_action(action,target,value)
     actions={'previous':0xB1,'next':0xB0,'toggle':0xB3,'stop':0xB2,'volume_up':0xAF,'volume_down':0xAE,'mute':0xAD}
     from companion import media_sessions
     session=media_sessions.valid_target(target)
@@ -275,6 +308,7 @@ def media(action, target, apps, value=None):
         target=preferred_media(media_snapshot(apps,fresh=True))
         if target=='ambiguous':raise ValueError('Hay varios reproductores disponibles. Elige cuál controlar en Música.')
         if target=='unavailable':raise ValueError('No se pudo comprobar qué reproductor está activo. Elígelo directamente en Música.')
+        if target=='system' and action in ('play','pause'):raise ValueError('El reproductor ya no está disponible para confirmar ese control. Ábrelo o selecciónalo directamente en Música. No se envió ninguna tecla a otra aplicación.')
     if media_sessions.valid_target(target):
         if not playback:raise ValueError('Usa los controles de volumen general de Windows.')
         return media_sessions.control(action,target)

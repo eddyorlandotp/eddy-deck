@@ -1,8 +1,8 @@
-# Eddy Deck
+# Eddy Deck 2.2.8 · Beta 10
 
-**Código público basado en 2.2.8-beta.10.** Incluye Windows, Android, interfaz, pruebas y manual. Los destinos personales de respaldo y los identificadores de dispositivos se sustituyeron por ejemplos. Esta copia no es idéntica a los instaladores privados; estos no se publican aquí. Consulta [PUBLICACION.md](docs/PUBLICACION.md) antes de compilar o ejecutar pruebas en dispositivos.
+Si una aplicación bloquea su ventana principal con un aviso o diálogo, Eddy Deck lo señala y conserva esa decisión pendiente. No intenta mover ni cerrar esa ventana desde los controles normales.
 
-## Versión base: 2.2.8 · Beta 10
+Beta 11 unifica todos los selectores, incorpora la descarga verificada de instaladores desde GitHub y corrige fallos de guardado, cancelación y aperturas que pedían permisos. La campaña de pruebas clasifica todo el catálogo y distingue aplicaciones observadas, controles confirmados, permisos, inicio de sesión y casos pendientes. Consulta [el recorrido y sus límites](docs/RECORRIDO-BETA11.md) y [las actualizaciones de GitHub](docs/ACTUALIZACIONES-GITHUB.md).
 
 Tu PC desde Android: aplicaciones, música, ventanas y rutinas. Windows y Android ejecutan el programa por sí mismos, sin IA ni suscripción a Codex. USB y Wi-Fi funcionan sin cuentas. Para controlar desde datos móviles, esta versión usa Tailscale; requiere su aplicación y una cuenta en ambos equipos.
 
@@ -31,7 +31,7 @@ También recupera explícitamente una copia de botones cuando el perfil está da
 
 El [entorno de compilación](docs/ENTORNO-COMPILACION.md) registra herramientas, dependencias y cuidados para futuras actualizaciones.
 
-En esta copia pública, el [botón de Drive](https://drive.google.com/drive/my-drive) abre la página general de tu propio Drive. Configura tu carpeta antes de distribuir tu compilación. Se abre en el navegador para descargar con tu cuenta; después el comprobador verifica el paquete extraído. No se configuró una actualización silenciosa desde Drive.
+[GitHub Releases](https://github.com/eddyorlandotp/eddy-deck/releases) es el origen de instaladores y versiones. El comprobador permite buscar, descargar y verificar la entrega sin iniciar sesión; instalar sigue siendo una acción explícita. Drive conserva una copia privada adicional de cada entrega.
 
 ## Uso diario
 
@@ -126,7 +126,7 @@ El panel del navegador de Windows puede necesitar abrirse otra vez desde la band
 
 ### Reparación completa del programa Windows
 
-**Comprobar archivos de Windows** verifica la firma RSA/SHA-256 y cada archivo. **Reparar archivos de Eddy Deck** utiliza la copia local firmada en `recovery` y el comprobador independiente en `Rescue`, cancela tareas pendientes y reinstala solo Eddy Deck. Conserva sus datos y las otras aplicaciones. Si no hay conexión, abre el acceso directo **Eddy Deck - Reparar** en Windows. La herramienta incluye un botón para abrir tu respaldo privado de Drive y elegir otra copia extraída. No repara Windows ni los archivos de aplicaciones ajenas.
+**Comprobar archivos de Windows** verifica la firma RSA/SHA-256 y cada archivo. **Reparar archivos de Eddy Deck** utiliza la copia local firmada en `recovery` y el comprobador independiente en `Rescue`, cancela tareas pendientes y reinstala solo Eddy Deck. Conserva sus datos y las otras aplicaciones. Si no hay conexión, abre el acceso directo **Eddy Deck - Reparar** en Windows. La herramienta incluye Buscar y descargar de GitHub, además de elegir otra copia extraída del celular. No repara Windows ni los archivos de aplicaciones ajenas.
 
 ### Particularidades de las aplicaciones
 
@@ -138,7 +138,7 @@ El catálogo verifica la instalación de los juegos de Steam mediante sus manifi
 
 La carpeta **Escritorio → Eddy Deck** reúne `MANUAL-USUARIO.html`, `GUIA-DE-USO.md`, `PRUEBAS-Y-LIMITES.md`, `Informes` y `Versiones`. Cada versión incluye código fuente, APK e instaladores. Para actualizarla tras compilar y empaquetar ejecuta `scripts/publish_desktop.py`; comprueba las copias y conserva las versiones anteriores. El instalador que lleva Android se actualiza compilando Windows primero.
 
-Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos actuales: `%USERPROFILE%\.eddydeck`.
+Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos: `%LOCALAPPDATA%\EddyDeck`.
 
 | Archivo | Uso |
 | --- | --- |

@@ -69,7 +69,7 @@ load=function(force=false){
     const sig=JSON.stringify([next.version,next.protocolVersion,next.capabilities,next.keepAwake,next.profile,next.apps,next.name,next.scanned,next.scanning,next.warnings,next.monitors,next.displayWarning,next.queue,next.installation,next.startup,next.internet,['home','music'].includes(page)?next.media:null,page==='pc'?[next.windows,next.events,next.powerError]:null,next.jobs,page==='settings'?next.devices:null]);
     // Do not mark a snapshot as rendered while a dialog is preserving an edit.
     // The next poll after closing it must still apply the deferred snapshot.
-    if((requestedForce||first||sig!==signature)&&!$('#modal').open&&!document.activeElement?.matches('input,select,textarea')){render();signature=sig;}
+    if((requestedForce||first||sig!==signature)&&!$('#modal').open&&!$('#choice-dialog')?.open&&!document.activeElement?.matches('input,select,textarea')){render();signature=sig;}
     updatePending();
   }while(task.force&&epoch===connectionEpoch);
   }catch(error){if(epoch!==connectionEpoch)return;online=false;if(!state){renderPairing();if(token||bootstrap?.paired)toast(error.message);}}

@@ -115,13 +115,15 @@ def _matches(app,processes,window_class=''):
 
 class Windows:
     def __init__(self):self.lock=threading.RLock();self.leases={};self.protected=set()
-    def require_window(self,wid,apps,terminate=False,allow_protected=False):
+    def require_window(self,wid,apps,terminate=False,allow_protected=False,allow_attention=False):
         current=self.snapshot(apps);item=next((w for w in current if w['id']==wid),None)
         if not item:raise ValueError('La ventana cambió o se cerró. Actualiza Mi PC.')
         with self.lock:
             if wid in self.protected and not allow_protected:raise ValueError('Esta ventana está protegida en Eddy Deck. Quita su protección antes de controlarla.')
             lease=self.leases.get(wid)
             if not lease:raise ValueError('La ventana cambió durante la comprobación.')
+            if item.get('needsAttention') and not (terminate or allow_protected or allow_attention):
+                raise ValueError('La aplicación tiene su ventana bloqueada por un aviso o diálogo. Atiéndelo en la PC antes de moverla o cerrarla.')
             if terminate:
                 path=Path(lease['process']['path'])
                 if not item['appIds'] or path.name.lower() in windows.DENY_EXE|{'eddydeck.exe','explorer.exe','applicationframehost.exe','shellexperiencehost.exe','startmenuexperiencehost.exe','svchost.exe','csrss.exe','wininit.exe','winlogon.exe','dwm.exe','lsass.exe','services.exe'} or path.is_relative_to(Path(os.environ.get('WINDIR',r'C:\Windows'))):
@@ -214,6 +216,7 @@ class Windows:
                 wid=hashlib.sha256(identity.encode()).hexdigest()[:32]
                 monitor=win32api.GetMonitorInfo(win32api.MonitorFromWindow(hwnd,2))
                 item={'id':wid,'title':title[:160],'appIds':app_ids,'process':Path(main['path']).name,'monitor':'display:'+monitor['Device'],'minimized':bool(g.IsIconic(hwnd)),'maximized':g.GetWindowPlacement(hwnd)[1]==3,'protected':wid in self.protected}
+                item['needsAttention']=not bool(g.IsWindowEnabled(hwnd))
                 fresh[wid]={'hwnd':hwnd,'identity':identity,'process':main,'attached':processes};result.append(item)
             except Exception:return
         g.EnumWindows(visit,None)
@@ -297,7 +300,9 @@ class Windows:
 
     def present(self,wid,settings,apps,check,activation='front'):
         settings=validate_layout(settings);validate_activation(activation)
-        item=self.require_window(wid,apps)
+        item=self.require_window(wid,apps,allow_attention=True)
+        if item.get('needsAttention'):
+            return {'status':'needs_attention','message':'La aplicación está abierta y tiene un aviso o diálogo pendiente en la PC. No se mueve ni se confirma automáticamente.','windowId':wid,'foreground':False}
         if settings['monitor']!='keep' or settings['mode']!='keep':result=self.move(wid,settings,apps,check)
         elif item['minimized']:result=self.restore(wid,apps,check)
         else:result={'status':'already_open','message':'Se conserva la ventana existente.','windowId':wid}
@@ -309,10 +314,10 @@ class Windows:
     def launch(self,app,url,settings,apps,check,activation='front'):
         settings=validate_layout(settings)
         validate_activation(activation)
-        if activation=='windows' and settings['monitor']=='keep' and settings['mode']=='keep':check();return windows.launch(app,url)
+        if activation=='windows' and settings['monitor']=='keep' and settings['mode']=='keep':check();return windows.launch(app,url,check)
         if settings['monitor']!='keep' or settings['mode']!='keep':resolve_monitor(settings,monitors()) # fail before launching on an absent monitor
         before=[w for w in self.snapshot(apps) if app['id'] in w['appIds']]
-        check();result=windows.launch(app,url);launched=time.monotonic();deadline=launched+30;stable=None;since=launched
+        check();result=windows.launch(app,url,check);launched=time.monotonic();deadline=launched+30;stable=None;since=launched
         while time.monotonic()<deadline:
             check();current=[w for w in self.snapshot(apps) if app['id'] in w['appIds']]
             new=[w for w in current if w['id'] not in {v['id'] for v in before}]

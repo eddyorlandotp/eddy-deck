@@ -161,6 +161,7 @@ class Queue:
                         continue
                     if result.get('status')=='needs_attention':failed=True
                     job['results'].append(result);self.journal.save_job(job)
+                    check()  # Cancellation during the final effect must not become "completed".
                 job.update(status='partial' if failed else 'completed',message='Terminó con avisos.' if failed else 'Completada.')
             except Cancelled as exc:job.update(status='cancelled',message=str(exc))
             except Exception as exc:job.update(status='failed',message=str(exc))

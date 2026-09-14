@@ -99,7 +99,7 @@ class Desktop:
         from companion.integrity import CHECKER
         helper=self.deck.data/'Rescue'/CHECKER
         if not helper.is_file():
-            messagebox.showerror('Eddy Deck','No hay copia local del comprobador. Abre el instalador o el respaldo de Drive.');return
+            messagebox.showerror('Eddy Deck','No hay copia local del comprobador. Abre el instalador o el descarga de GitHub.');return
         subprocess.Popen([str(helper),'--repair'],creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     def report(self):
         from companion.diagnostics import report

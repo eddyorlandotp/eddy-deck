@@ -6,7 +6,7 @@ from companion.core import VERSION
 
 def product_sources():
     paths=list((ROOT/'companion').glob('*.py'))+list((ROOT/'android/src').rglob('*.java'))
-    paths += [ROOT/'run.py',ROOT/'installer/Compatibility.cs',ROOT/'android/AndroidManifest.xml',ROOT/'android/res/values/styles.xml',*list((ROOT/'companion').glob('*.cs'))]+[ROOT/'ui'/name for name in ('app.js','extended.js','beta2.js','pickers.js','styles.css','index.html')]
+    paths += [ROOT/'run.py',ROOT/'installer/Compatibility.cs',ROOT/'installer/GitHubUpdate.cs',ROOT/'android/AndroidManifest.xml',ROOT/'android/res/values/styles.xml',*list((ROOT/'companion').glob('*.cs'))]+[ROOT/'ui'/name for name in ('app.js','extended.js','beta2.js','pickers.js','styles.css','index.html')]
     return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 
 def validate_beta5(out):
@@ -100,7 +100,28 @@ def validate_beta10(out):
     if copies.get('version')!=VERSION or not all(copies.get(k) for k in ('installedApkMatches','phoneWindowsInstallerMatches','phoneDocumentationMatches')):raise RuntimeError('Faltan copias verificadas beta10.')
     if not phone.get('passed') or phone.get('version')!=VERSION or phone.get('installedApkSHA256')!=hashlib.sha256((out/'EddyDeck-Android.apk').read_bytes()).hexdigest():raise RuntimeError('Falta comprobar el menú en el Android instalado.')
 
+def validate_beta11(out):
+    def report(name):
+        try:return json.loads((out/('beta11-'+name+'.json')).read_text(encoding='utf-8-sig'))
+        except (OSError,ValueError):raise RuntimeError('Falta un informe válido de beta11: '+name) from None
+    for name,minimum in [('core-tests',242),('visual-tests',55),('pickers-tests',31)]:
+        item=report(name)
+        if not item.get('passed') or item.get('testsRun',item.get('count',0))<minimum or item.get('sourceHashes')!=product_sources():raise RuntimeError('Falta regresión actual beta11: '+name)
+    updater=report('updater-tests')
+    if not updater.get('passed') or updater.get('count',0)<49 or updater.get('sourceSHA256')!=hashlib.sha256((ROOT/'installer/GitHubUpdate.cs').read_bytes()).hexdigest():raise RuntimeError('Falta probar el actualizador C# actual.')
+    http=report('http-tests');monitor=report('monitor-tests');catalog=report('catalog-live')
+    if http.get('failures') or http.get('count',0)<90 or not monitor.get('passed') or monitor.get('topologies',0)<1000:raise RuntimeError('Falta matriz HTTP/monitores.')
+    if len(catalog['rows'])!=catalog['catalogCount'] or len({r['id'] for r in catalog['rows']})!=catalog['catalogCount']:raise RuntimeError('Hay entradas del catálogo sin clasificar.')
+    phone=report('phone-walkthrough');apk=hashlib.sha256((out/'EddyDeck-Android.apk').read_bytes()).hexdigest()
+    if not phone.get('passed') or phone.get('installedApkSHA256')!=apk or not phone.get('profilePreserved'):raise RuntimeError('Falta recorrido físico del Samsung actual.')
+    android=report('android-installed-tests');release=report('release-verification')
+    if not android.get('passed') or android.get('installedVersion')!=VERSION or android.get('basicAssertions',0)<63 or android.get('checks',0)<24:raise RuntimeError('Falta regresión Android instalada.')
+    if release.get('version')!=VERSION or not all(release.get(k) for k in ('releaseVerified','installedIntegrityVerified','profileAndPairingPreserved','phoneReconnectedAfterUpdate')):raise RuntimeError('Falta instalación beta11 verificada.')
+    resolution=report('review-resolution')
+    if resolution.get('rounds')!=1 or not resolution.get('readOnly') or not resolution.get('resolutions'):raise RuntimeError('Falta resolución de la revisión de Claude.')
+
 def validate_completed(out):
+    if VERSION=='2.2.9-beta.11':return validate_beta11(out)
     if VERSION=='2.2.8-beta.10':return validate_beta10(out)
     if VERSION=='2.2.7-beta.9':return validate_beta9(out)
     if VERSION=='2.2.6-beta.8':return validate_beta8(out)

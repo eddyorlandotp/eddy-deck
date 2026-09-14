@@ -17,10 +17,10 @@ def prepare_key():
     return key,mod,p.e
 def sign(folder):
     from companion.core import VERSION
-    from companion.integrity import DRIVE_URL,MANIFEST,SIGNATURE
+    from companion.integrity import UPDATE_URL,MANIFEST,SIGNATURE
     key,_,_=prepare_key();folder=Path(folder)
     files={p.relative_to(folder).as_posix():{'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'size':p.stat().st_size} for p in sorted(folder.rglob('*')) if p.is_file() and p.name not in (MANIFEST,SIGNATURE)}
-    m={'schema':1,'version':VERSION,'architecture':'x64','minWindowsBuild':22000,'backupFolderUrl':DRIVE_URL,'files':files}
+    m={'schema':1,'version':VERSION,'architecture':'x64','minWindowsBuild':22000,'backupFolderUrl':UPDATE_URL,'files':files}
     raw=json.dumps(m,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
     (folder/MANIFEST).write_bytes(raw);(folder/SIGNATURE).write_bytes(base64.b64encode(key.sign(raw,padding.PKCS1v15(),hashes.SHA256())))
     print('Manifiesto firmado:',len(files),'archivos; clave privada excluida.')

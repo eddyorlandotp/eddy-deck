@@ -3,6 +3,7 @@ import json,subprocess,sys,threading,time
 from pathlib import Path
 from companion.layout import Windows
 from companion.windows import folded,HIDDEN
+from companion.child_lifetime import run_owned
 _lock=threading.RLock();_cached=None;_until=0;_cache_key=None
 
 def target(apps):
@@ -22,7 +23,7 @@ def invoke(action,apps):
     helper=Path(sys.executable).parent/'EddyDeck-Tidal.exe' if getattr(sys,'frozen',False) else root/'.build/EddyDeck-Tidal.exe'
     if not helper.is_file():raise RuntimeError('Falta el controlador de TIDAL. Repara los archivos de Eddy Deck en Windows.')
     p=lease['process']
-    try:r=subprocess.run([str(helper),str(lease['hwnd']),str(p['pid']),str(p['created']),p['path'],action],capture_output=True,text=True,encoding='utf-8-sig',creationflags=HIDDEN,timeout=12)
+    try:r=run_owned([str(helper),str(lease['hwnd']),str(p['pid']),str(p['created']),p['path'],action],capture_output=True,text=True,encoding='utf-8-sig',creationflags=HIDDEN,timeout=12)
     except subprocess.TimeoutExpired:raise RuntimeError('TIDAL tardó demasiado. No se repetirá el control automáticamente; revisa el reproductor.') from None
     try:result=json.loads(r.stdout)
     except (ValueError,TypeError):raise RuntimeError('El controlador de TIDAL no devolvió un resultado válido.') from None

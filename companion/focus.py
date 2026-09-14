@@ -1,14 +1,21 @@
 """Bounded foreground activation in a disposable process, never on the job worker."""
-import json,subprocess,sys,time
+import json,subprocess,sys,time,tempfile
 from pathlib import Path
+from companion.child_lifetime import Lifetime,await_gate
 
 def command():
     return [sys.executable,'--focus-window'] if getattr(sys,'frozen',False) else [sys.executable,str(Path(__file__).resolve().parents[1]/'run.py'),'--focus-window']
 
 def run_bounded(request,check=lambda:None,timeout=2.5):
+    with tempfile.TemporaryDirectory(prefix='eddy-focus-') as folder,Lifetime() as lifetime:
+        gate=Path(folder)/'ready'
+        return _run_bounded({**request,'gate':str(gate)},check,timeout,lifetime,gate)
+
+def _run_bounded(request,check,timeout,lifetime,gate):
     check()
     child=subprocess.Popen([*command(),json.dumps(request,separators=(',',':'))],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     try:
+        lifetime.attach(child);gate.write_bytes(b'ready')
         deadline=time.monotonic()+timeout
         while child.poll() is None:
             check()
@@ -60,6 +67,7 @@ def main():
     try:
         if len(sys.argv)!=3 or len(sys.argv[2])>2048:raise ValueError('Invalid request')
         request=json.loads(sys.argv[2])
+        await_gate(request)
         result=activate(request)
     except Exception:result={'foreground':False}
     raise SystemExit(0 if result.get('foreground') else 2)

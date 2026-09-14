@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.asymmetric import padding,rsa
 
 MANIFEST='release-manifest.json';SIGNATURE='release-manifest.sig'
 CHECKER='EddyDeck-Compatibilidad.exe'
-DRIVE_URL='https://drive.google.com/drive/my-drive'
+UPDATE_URL='https://github.com/eddyorlandotp/eddy-deck/releases'
 
 def public_key():
     from companion.release_public import MODULUS,EXPONENT
@@ -52,11 +52,11 @@ def cache_release(source,data):
 def repair_status(data):
     from companion.core import VERSION
     data=Path(data)
-    return {'available':(data/'recovery'/(VERSION+'.zip')).is_file() and (data/'Rescue'/CHECKER).is_file(),'backupUrl':DRIVE_URL,'version':VERSION}
+    return {'available':(data/'recovery'/(VERSION+'.zip')).is_file() and (data/'Rescue'/CHECKER).is_file(),'backupUrl':UPDATE_URL,'version':VERSION}
 def start_repair(data):
     from companion.core import VERSION
     data=Path(data);cache=data/'recovery'/(VERSION+'.zip');checker=data/'Rescue'/CHECKER
     with zipfile.ZipFile(cache) as z:m=manifest_bytes(z.read(MANIFEST),z.read(SIGNATURE))
-    if m['version']!=VERSION or hashlib.sha256(checker.read_bytes()).hexdigest()!=m['files'][CHECKER]['sha256']:raise ValueError('La herramienta de reparación no coincide. Usa la copia del celular o de Drive.')
+    if m['version']!=VERSION or hashlib.sha256(checker.read_bytes()).hexdigest()!=m['files'][CHECKER]['sha256']:raise ValueError('La herramienta de reparación no coincide. Usa la copia del celular o de GitHub.')
     subprocess.Popen([str(checker),'--repair-now'],creationflags=0x08000000)
     return {'status':'restarting','message':'Comprobando y restaurando los archivos de Eddy Deck. La conexión volverá al terminar.'}

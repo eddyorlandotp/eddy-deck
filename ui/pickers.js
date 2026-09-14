@@ -21,14 +21,14 @@
   function choose(index){const select=active,option=select?.options[index];if(!select?.isConnected||!option||option.hidden||option.disabled||select.disabled)return;const changed=select.selectedIndex!==index;select.selectedIndex=index;sync(select);close();if(changed){select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));}}
   function open(select){if(select.disabled||!select.isConnected)return;if(dialog.open)close();active=select;returnFocus=enhanced.get(select);sync(select);returnFocus?.setAttribute('aria-expanded','true');search.value='';dialog.querySelector('#choice-title').textContent=labelFor(select);dialog.querySelector('.choice-search').hidden=[...select.options].filter(o=>!o.hidden).length<8;dialog.showModal();draw();list.focus({preventScroll:true});}
   function enhance(){
-    document.querySelectorAll('#modal select:not([multiple])').forEach(select=>{if(enhanced.has(select)){sync(select);return;}const button=document.createElement('button');button.type='button';button.className='choice-trigger';button.dataset.choiceFor=select.id||('choice-source-'+(++serial));if(!select.id)select.id=button.dataset.choiceFor;button.innerHTML=`<span class="choice-value"></span>${icon('down')}`;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','choice-dialog');button.setAttribute('aria-expanded','false');
+    document.querySelectorAll('select:not([multiple])').forEach(select=>{if(enhanced.has(select)){sync(select);return;}const button=document.createElement('button');button.type='button';button.className='choice-trigger';button.dataset.choiceFor=select.id||('choice-source-'+(++serial));if(!select.id)select.id=button.dataset.choiceFor;button.innerHTML=`<span class="choice-value"></span>${icon('down')}`;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','choice-dialog');button.setAttribute('aria-expanded','false');
       select.classList.add('choice-native');select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.after(button);enhanced.set(select,button);button.addEventListener('click',()=>open(select));select.addEventListener('change',()=>sync(select));select.addEventListener('invalid',e=>{e.preventDefault();open(select);});sync(select);
     });
     if(active&&!active.isConnected)close();
   }
   dialog.querySelector('.choice-head button').addEventListener('click',close);
   dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close();}});
-  dialog.addEventListener('close',()=>{if(dialog.open)return;const target=returnFocus;target?.setAttribute('aria-expanded','false');active=null;returnFocus=null;if(target?.isConnected&&$('#modal').open)target.focus({preventScroll:true});});
+  dialog.addEventListener('close',()=>{if(dialog.open)return;const target=returnFocus;target?.setAttribute('aria-expanded','false');active=null;returnFocus=null;if(target?.isConnected&&(!target.closest('#modal')||$('#modal').open))target.focus({preventScroll:true});});
   search.addEventListener('input',draw);
   dialog.addEventListener('keydown',e=>{if(e.key==='Escape')return;const rows=options();if(e.target===search){if(e.key==='ArrowDown'){e.preventDefault();list.focus();move(0);}if(e.key==='Enter'&&rows[activeIndex]){e.preventDefault();choose(Number(rows[activeIndex].dataset.optionIndex));}return;}if(!list.contains(e.target)&&e.target!==list)return;
     if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();move(e.key==='Home'?0:e.key==='End'?rows.length-1:activeIndex+(e.key==='ArrowDown'?1:-1));}
@@ -36,7 +36,8 @@
   });
   $('#modal').addEventListener('close',close);
   const observer=new MutationObserver(changes=>{if(changes.some(c=>c.type==='childList'&&[...c.addedNodes,...c.removedNodes].some(n=>n.nodeType===1&&(n.matches?.('select,option,form')||n.querySelector?.('select')))||c.target.matches?.('select,option')))enhance();});
-  observer.observe($('#modal-content'),{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','hidden','selected']});
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','hidden','selected']});
+  enhance();
   function decorate(){
     const routine=$('#routine-form'),step=$('#step-form');$('#modal').classList.toggle('routine-dialog',Boolean(routine||step));
     if(routine){routine.insertAdjacentHTML('afterbegin',`<div class="editor-intro"><span class="editor-emblem">${icon('modes')}</span><p>Tu espacio, a tu manera.<small>Ordena las acciones. Inicia todo con un toque.</small></p></div>`);const steps=routine.querySelector('.routine-steps');steps.insertAdjacentHTML('beforebegin',`<div class="steps-heading"><h3>Secuencia</h3><span>${routineDraft.length} de 24 pasos</span></div>`);if(!routineDraft.length)steps.innerHTML=`<div class="routine-empty">${icon('plus')}<strong>Empieza con una acción</strong><span>Abre una app, mueve su ventana o pon música.</span></div>`;

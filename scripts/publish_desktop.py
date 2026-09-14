@@ -1,6 +1,6 @@
 """Publish a versioned, verified personal handoff on the actual Windows desktop."""
 from pathlib import Path
-import hashlib,json,shutil,sys
+import hashlib,json,shutil,sys,os
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from companion.core import VERSION
@@ -35,7 +35,8 @@ docs: arquitectura, seguridad, compatibilidad e historia por aplicación.
 Informes: evidencias de las pruebas.
 Versiones/{VERSION}: código, APK y paquetes de Windows/Android.
 
-Respaldo privado: https://drive.google.com/drive/my-drive
+Actualizaciones: https://github.com/eddyorlandotp/eddy-deck/releases
+Respaldo privado: {os.environ.get("EDDY_DECK_BACKUP_URL","https://drive.google.com/drive/my-drive")}
 Necesitas tu cuenta para descargarlo. El comprobador verifica después la copia.
 
 El código es independiente de Codex. Las claves para firmar Android y Windows
