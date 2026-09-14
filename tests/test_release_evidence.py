@@ -21,7 +21,7 @@ class EvidenceTests(unittest.TestCase):
     def test_completed_reports_pass_without_creating_a_package(self):
         validate_completed(self.out);self.assertFalse(list(self.out.glob('*.zip')))
     def test_future_version_cannot_publish_only_historical_evidence(self):
-        with patch('scripts.package_evidence.VERSION','2.2.8-beta.10'):
+        with patch('scripts.package_evidence.VERSION','2.2.9-beta.11'):
             with self.assertRaisesRegex(RuntimeError,'matriz de evidencias'):validate_completed(self.out)
     def test_running_or_shortened_test_blocks_publication(self):
         for value in ({'status':'running'},{'elapsedSeconds':8999}):

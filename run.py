@@ -1,6 +1,11 @@
 from companion.supervisor import entry
 if __name__ == '__main__':
-    try:entry()
+    try:
+        import sys
+        if len(sys.argv)==3 and sys.argv[1]=='--focus-window':
+            from companion.focus import main
+            main()
+        else:entry()
     except Exception as error:
         import logging,sys
         logging.exception('Eddy Deck no pudo iniciar o terminó inesperadamente.')

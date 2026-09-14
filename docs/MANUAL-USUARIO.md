@@ -1,5 +1,20 @@
 # Eddy Deck · Manual de usuario
 
+## Abrir aplicaciones al frente · beta 10
+
+En el menú de un botón, abre **Pantalla y tamaño al abrir → Al abrir la aplicación**. En una rutina, edita un paso **Abrir aplicación** y busca la misma opción.
+
+- **Traer al frente:** muestra la ventana de la aplicación delante y la activa. Es la opción inicial, también para botones/rutinas creados antes. Si la app ya estaba abierta se reutiliza su ventana; no hace falta abrir otra.
+- **Dejar que Windows decida:** Eddy Deck no solicita activarla al frente. Windows o la propia app pueden hacerlo al abrirla. No significa forzarla detrás.
+- **Minimizada** tiene prioridad: no se restaura al frente cuando pediste abrirla minimizada. Mover una ventana o controlar música no aplica esta opción.
+
+No equivale a «siempre encima». Si otra app se abre después, puede quedar delante. En una rutina se aplica paso por paso; la última aplicación abierta al frente queda activa.
+
+**Si falta una aplicación de la rutina:** revisa Rutinas → Cola y resultados → Ver pasos. Cuando un paso falla y elegiste «detener si falla», los siguientes no se ejecutan. Ahora ese motivo se muestra claramente. Puedes elegir continuar ante errores en el editor de rutina; los errores siguen registrados. Si Windows solo rechaza activar una ventana que sí abrió, se registra un aviso y continúan los pasos siguientes.
+
+Roblox puede maximizarse aunque no declare los botones típicos de una ventana. Eddy Deck comprueba el resultado. Las mitades de pantalla y otros tamaños siguen dependiendo de lo que acepte cada aplicación. Con varias ventanas de una misma app, elige la exacta en Mi PC antes de moverla; Eddy Deck no activa una al azar.
+
+
 Versión 2.2.7-beta.9 · 13 de septiembre de 2026
 
 Eddy Deck convierte tu celular en un control para tu computadora Windows. Abre aplicaciones, organiza ventanas, controla música y ejecuta tus rutinas. El programa funciona por sí mismo: no necesita IA ni una suscripción a Codex.

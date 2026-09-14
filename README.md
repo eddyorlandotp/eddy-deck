@@ -1,12 +1,15 @@
 # Eddy Deck
 
-**Código público basado en 2.2.7-beta.9.** Incluye Windows, Android, interfaz, pruebas y manual. Los destinos personales de respaldo y los identificadores de dispositivos se sustituyeron por ejemplos. Esta copia no es idéntica a los instaladores privados ya entregados; estos no se publican aquí. Consulta [PUBLICACION.md](docs/PUBLICACION.md) antes de compilar o ejecutar pruebas en dispositivos.
+**Código público basado en 2.2.8-beta.10.** Incluye Windows, Android, interfaz, pruebas y manual. Los destinos personales de respaldo y los identificadores de dispositivos se sustituyeron por ejemplos. Esta copia no es idéntica a los instaladores privados; estos no se publican aquí. Consulta [PUBLICACION.md](docs/PUBLICACION.md) antes de compilar o ejecutar pruebas en dispositivos.
 
-## Versión base: 2.2.7 · Beta 9
+## Versión base: 2.2.8 · Beta 10
 
 Tu PC desde Android: aplicaciones, música, ventanas y rutinas. Windows y Android ejecutan el programa por sí mismos, sin IA ni suscripción a Codex. USB y Wi-Fi funcionan sin cuentas. Para controlar desde datos móviles, esta versión usa Tailscale; requiere su aplicación y una cuenta en ambos equipos.
 
 ## Manual y novedades de esta beta
+
+Beta 10 corrige el bloqueo de rutinas al maximizar Roblox: su ventana no declara los botones habituales, pero acepta maximizarse. Ahora se comprueba el resultado real. Al abrir una aplicación puedes elegir **Traer al frente** (predeterminado, también para botones/rutinas anteriores) o **Dejar que Windows decida**. La opción se guarda en botones y pasos de apertura; mover y controlar música conservan su comportamiento. Si eliges **Minimizada**, tiene prioridad. Consulta [aperturas y primer plano](docs/APERTURAS-BETA10.md).
+
 
 Beta 9 corrige la identidad distinta entre arranques desde Codex y desde Windows: todos usan ahora `%USERPROFILE%\.eddydeck`. Conserva certificados, vinculación, botones y rutinas; las carpetas anteriores permanecen como respaldo. Mejora la búsqueda de la misma PC tras cambios de red y evita reenviar órdenes a ciegas. Consulta [la reconexión y sus límites](docs/RECONEXION-BETA9.md).
 
@@ -28,7 +31,7 @@ También recupera explícitamente una copia de botones cuando el perfil está da
 
 El [entorno de compilación](docs/ENTORNO-COMPILACION.md) registra herramientas, dependencias y cuidados para futuras actualizaciones.
 
-En esta copia pública, el [botón de Drive](https://drive.google.com/drive/my-drive) abre la página general de tu propio Drive. Debes configurar tu carpeta de respaldo antes de distribuir tu compilación. Se abre en el navegador para descargar con tu cuenta; después el comprobador verifica el paquete extraído. No se configuró una actualización silenciosa desde Drive.
+En esta copia pública, el [botón de Drive](https://drive.google.com/drive/my-drive) abre la página general de tu propio Drive. Configura tu carpeta antes de distribuir tu compilación. Se abre en el navegador para descargar con tu cuenta; después el comprobador verifica el paquete extraído. No se configuró una actualización silenciosa desde Drive.
 
 ## Uso diario
 
@@ -135,7 +138,7 @@ El catálogo verifica la instalación de los juegos de Steam mediante sus manifi
 
 La carpeta **Escritorio → Eddy Deck** reúne `MANUAL-USUARIO.html`, `GUIA-DE-USO.md`, `PRUEBAS-Y-LIMITES.md`, `Informes` y `Versiones`. Cada versión incluye código fuente, APK e instaladores. Para actualizarla tras compilar y empaquetar ejecuta `scripts/publish_desktop.py`; comprueba las copias y conserva las versiones anteriores. El instalador que lleva Android se actualiza compilando Windows primero.
 
-Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos actuales: `%USERPROFILE%\.eddydeck` (la carpeta antigua se conserva durante la migración).
+Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos actuales: `%USERPROFILE%\.eddydeck`.
 
 | Archivo | Uso |
 | --- | --- |

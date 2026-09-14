@@ -1,6 +1,6 @@
 # Publicación del código
 
-Esta instantánea pública parte del código de Eddy Deck 2.2.7-beta.9. Incluye la licencia MIT del código propio y la información de dependencias. No contiene claves de firma, datos de vinculación, perfiles privados, informes crudos del dispositivo ni instaladores personales.
+Esta instantánea pública parte del código de Eddy Deck 2.2.8-beta.10. Incluye la licencia MIT del código propio y la información de dependencias. No contiene claves de firma, datos de vinculación, perfiles privados, informes crudos del dispositivo ni instaladores personales.
 
 ## Cambios exclusivos de esta copia
 
@@ -23,6 +23,6 @@ Configura el destino de tus respaldos de manera coherente antes de generar una n
 
 `python -m unittest discover -s tests -v` ejecuta los archivos test_*.py con fixtures y directorios temporales. Los scripts de pruebas reales tienen nombres independientes: inspecciónalos y configúralos antes de ejecutarlos; algunos abren aplicaciones, cambian el volumen o interrumpen redes en el equipo de prueba. No son una prueba automática segura para cualquier equipo sin preparación.
 
-La versión base registró 211 pruebas Python, 63 comprobaciones Android y tres reaperturas con 24 comprobaciones, además de pruebas locales de reconexión. La copia pública pasó de nuevo las 211 pruebas Python el 13 de septiembre de 2026 (14.707 segundos, sin fallos). Las pruebas de Android y hardware de la distribución pública no se han repetido.
+La versión base pasó 224 pruebas Python, 15 comprobaciones de la opción de primer plano en la interfaz, 55 regresiones visuales y diez casos Windows reales con Roblox/TIDAL. Esta copia pública pasó también las 224 pruebas Python (15.812 segundos). Los informes privados de instalación conservan las pruebas adicionales del Samsung. No se compilaron instaladores para esta distribución pública; los resultados Android/Windows pertenecen a la distribución privada indicada, no a un binario público nuevo.
 
 Siguen pendientes: datos móviles reales/otra red, un reinicio completo de Windows y otras computadoras. Tailscale requiere conexión y cuenta en ambos dispositivos; el código no garantiza despertar remoto, superar bloqueos de red ni disponibilidad de terceros.

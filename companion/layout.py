@@ -6,6 +6,10 @@ from companion import windows
 
 MODES={'keep','windowed','maximized','minimized','left-half','right-half'}
 
+def validate_activation(value='front'):
+    if value not in ('front','windows'):raise ValueError('Opción de primer plano no válida.')
+    return value
+
 def validate_layout(value,allow_ask=False):
     if value is None:return {'monitor':'keep','mode':'keep','missing':'stop'}
     if not isinstance(value,dict):raise ValueError('Diseño de ventana no válido.')
@@ -52,6 +56,8 @@ if os.name=='nt':
     k.GetProcessTimes.argtypes=[W.HANDLE,C.POINTER(W.FILETIME),C.POINTER(W.FILETIME),C.POINTER(W.FILETIME),C.POINTER(W.FILETIME)]
     k.GetApplicationUserModelId.argtypes=[W.HANDLE,C.POINTER(W.UINT),W.LPWSTR]
     u.ShowWindowAsync.argtypes=[W.HWND,C.c_int];u.ShowWindowAsync.restype=W.BOOL
+    u.AttachThreadInput.argtypes=[W.DWORD,W.DWORD,W.BOOL];u.AttachThreadInput.restype=W.BOOL
+    u.IsHungAppWindow.argtypes=[W.HWND];u.IsHungAppWindow.restype=W.BOOL
     u.SetThreadDpiAwarenessContext.argtypes=[W.HANDLE];u.SetThreadDpiAwarenessContext.restype=W.HANDLE
     dwm.DwmGetWindowAttribute.argtypes=[W.HWND,W.DWORD,C.c_void_p,W.DWORD]
 
@@ -232,7 +238,9 @@ class Windows:
         hwnd=lease['hwnd'];mode=settings['mode'];x,y,r,b=target['work'];width=r-x;height=b-y
         if width<=0 or height<=0:raise ValueError('Windows reportó una pantalla sin área utilizable. Actualiza las pantallas.')
         style=g.GetWindowLong(hwnd,-16);resizable=bool(style&0x40000)
-        if mode in ('maximized','left-half','right-half') and not resizable and not style&0x10000:
+        # Borderless apps such as Roblox accept SW_MAXIMIZE without advertising
+        # WS_THICKFRAME or WS_MAXIMIZEBOX. Observe the result instead of guessing.
+        if mode in ('left-half','right-half') and not resizable and not style&0x10000:
             raise ValueError('Esta ventana tiene tamaño fijo. Usa modo ventana para moverla entre pantallas.')
         if mode=='minimized' and settings['monitor']=='keep':u.ShowWindowAsync(hwnd,6)
         else:
@@ -272,10 +280,37 @@ class Windows:
             if on_monitor and state_ok:return {'status':'completed','message':'Ventana en '+target['label']+(' (se usó la principal porque faltó el destino).' if fallback else '.')+(' Se conservó su tamaño fijo.' if not resizable and mode=='windowed' else ''),'windowId':wid}
             time.sleep(.1)
         raise ValueError('La aplicación no aceptó el diseño. Prueba modo ventana desde la app; los juegos a pantalla completa pueden controlar su posición.')
-    def launch(self,app,url,settings,apps,check):
+    def foreground(self,wid,apps,check=lambda:None):
+        import win32gui as g
+        from companion.focus import run_bounded
+        self.require_window(wid,apps)
+        with self.lock:lease=dict(self.leases[wid]);hwnd=lease['hwnd']
+        check()
+        if g.IsIconic(hwnd):self.restore(wid,apps,check)
+        self.require_window(wid,apps)
+        request={'hwnd':hwnd,'pid':lease['process']['pid'],'created':lease['process']['created'],'class':g.GetClassName(hwnd)}
+        result=run_bounded(request,check)
+        check();self.require_window(wid,apps)
+        if result.get('foreground') and g.GetForegroundWindow()==hwnd:
+            return {'status':'completed','message':'Ventana mostrada al frente.','windowId':wid,'foreground':True}
+        return {'status':'needs_attention','message':'La aplicación está abierta, pero Windows no permitió activarla al frente a tiempo. Revisa su ventana en la PC.','windowId':wid,'foreground':False}
+
+    def present(self,wid,settings,apps,check,activation='front'):
+        settings=validate_layout(settings);validate_activation(activation)
+        item=self.require_window(wid,apps)
+        if settings['monitor']!='keep' or settings['mode']!='keep':result=self.move(wid,settings,apps,check)
+        elif item['minimized']:result=self.restore(wid,apps,check)
+        else:result={'status':'already_open','message':'Se conserva la ventana existente.','windowId':wid}
+        if activation=='front' and settings['mode']!='minimized':
+            shown=self.foreground(wid,apps,check)
+            return {**result,**shown,'message':result['message']+' '+shown['message']}
+        return result
+
+    def launch(self,app,url,settings,apps,check,activation='front'):
         settings=validate_layout(settings)
-        if settings['monitor']=='keep' and settings['mode']=='keep':check();return windows.launch(app,url)
-        resolve_monitor(settings,monitors()) # fail before launching on an absent monitor
+        validate_activation(activation)
+        if activation=='windows' and settings['monitor']=='keep' and settings['mode']=='keep':check();return windows.launch(app,url)
+        if settings['monitor']!='keep' or settings['mode']!='keep':resolve_monitor(settings,monitors()) # fail before launching on an absent monitor
         before=[w for w in self.snapshot(apps) if app['id'] in w['appIds']]
         check();result=windows.launch(app,url);launched=time.monotonic();deadline=launched+30;stable=None;since=launched
         while time.monotonic()<deadline:
@@ -285,7 +320,10 @@ class Windows:
             if len(chosen)==1:
                 wid=chosen[0]['id']
                 if stable!=wid:stable=wid;since=time.monotonic()
-                if time.monotonic()-since>=1 and time.monotonic()-launched>=2:return self.move(wid,settings,apps,check)
+                if time.monotonic()-since>=1 and time.monotonic()-launched>=2:
+                    result=self.present(wid,settings,apps,check,activation)
+                    if settings['monitor']=='keep' and settings['mode']=='keep' and result['status']=='completed':result['message']='Apertura observada. '+result['message']
+                    return result
             else:stable=None
             if len(chosen)>1 and time.monotonic()-launched>=3:raise ValueError('Hay varias ventanas de '+app['name']+'. Selecciona la ventana exacta en Mi PC.')
             time.sleep(.3)

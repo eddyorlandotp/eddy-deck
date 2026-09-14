@@ -9,11 +9,11 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from companion import windows
-from companion.layout import Windows, monitors, validate_layout, resolve_monitor
+from companion.layout import Windows, monitors, validate_layout, resolve_monitor, validate_activation
 from companion.jobs import Journal, Queue, ReceiptError
 from companion.network import interface_addresses
 
-VERSION='2.2.7-beta.9'
+VERSION='2.2.8-beta.10'
 PORT=47990
 LOCAL_PORT=47989
 DISCOVERY_PORT=47991
@@ -202,7 +202,7 @@ class Deck:
         from companion.supervisor import active
         with self.lock:
             apps=copy.deepcopy(self.apps); profile=copy.deepcopy(self.profile)
-            result={'version':VERSION,'protocolVersion':2,'capabilities':{'windowControls':True,'fileRepair':True,'queuePause':True,'mediaSessions':True},'name':socket.gethostname(),'connected':True,'profile':profile,
+            result={'version':VERSION,'protocolVersion':2,'capabilities':{'windowControls':True,'launchForeground':True,'fileRepair':True,'queuePause':True,'mediaSessions':True},'name':socket.gethostname(),'connected':True,'profile':profile,
                     'apps':apps,'scanned':self.scanned,'scanning':self.scanning,'warnings':self.warnings,
                     'events':list(self.events),'pending':self.pending_status(),'powerError':self.power_error,
                     'dryRun':self.dry_run,'addresses':self.addresses,'port':self.port,
@@ -286,7 +286,9 @@ class Deck:
             if url and not app['browser']:raise ValueError('Esta aplicación no admite una URL.')
         policy=step.get('ifOpen','reuse')
         if policy not in ('reuse','launch'):raise ValueError('Opción de aplicación abierta no válida.')
-        return {'type':kind,'appId':aid,'url':url,'layout':validate_layout(step.get('layout')),'ifOpen':policy}
+        result={'type':kind,'appId':aid,'url':url,'layout':validate_layout(step.get('layout')),'ifOpen':policy}
+        if kind=='launch':result['activation']=validate_activation(step.get('activation','front'))
+        return result
 
     def enqueue(self,name,steps,device,on_error='stop'):
         # This lock is also used by energy confirmation and repair. There is no
@@ -340,16 +342,16 @@ class Deck:
         if kind=='launch' and step.get('ifOpen','reuse')=='reuse' and not step['url'] and self.adapter is windows:
             found=[w for w in self.layouts.snapshot(self.apps) if app['id'] in w['appIds']]
             if found:
-                if settings['monitor']=='keep' and settings['mode']=='keep':
-                    if len(found)==1 and found[0]['minimized']:return self.layouts.restore(found[0]['id'],self.apps,check)
+                if len(found)>1 and step.get('activation','front')=='windows' and settings['monitor']=='keep' and settings['mode']=='keep':
                     if all(w['minimized'] for w in found):raise ValueError('Hay varias ventanas minimizadas. Selecciona cuál restaurar en Mi PC.')
                     return {'status':'already_open','message':app['name']+' ya está abierta. Se conserva su ventana.'}
                 if len(found)!=1:raise ValueError('Hay varias ventanas de '+app['name']+'. Selecciona una en Mi PC.')
-                return self.layouts.move(found[0]['id'],settings,self.apps,check)
+                return self.layouts.present(found[0]['id'],settings,self.apps,check,step.get('activation','front'))
         if kind=='window':
             found=[w for w in self.layouts.snapshot(self.apps) if app['id'] in w['appIds']]
             if len(found)!=1:raise ValueError('No hay una ventana única de '+app['name']+'. Abre la app o selecciona su ventana en Mi PC.')
             return self.layouts.move(found[0]['id'],settings,self.apps,check)
+        if self.adapter is windows:return self.layouts.launch(app,step['url'],settings,self.apps,check,step.get('activation','front'))
         if settings['monitor']=='keep' and settings['mode']=='keep':return self.execute_app(app['id'],step['url'])
         return self.layouts.launch(app,step['url'],settings,self.apps,check)
 
@@ -464,6 +466,7 @@ class Deck:
             color=body.get('color','peach')
             if color not in COLORS: raise ValueError('Color no válido.')
             layout=validate_layout(body.get('layout'),allow_ask=True)
+            activation=validate_activation(body.get('activation','front'))
             with self.lock:
                 card_id=body.get('id')
                 if card_id:
@@ -474,7 +477,7 @@ class Deck:
                     card=self.make_card(app,len(self.profile['cards'])); self.profile['cards'].append(card)
                 policy=body.get('ifOpen','reuse')
                 if policy not in ('reuse','launch'):raise ValueError('Opción de aplicación abierta no válida.')
-                card.update(appId=app['id'],name=name,url=url,color=color,layout=layout,ifOpen=policy); self.save()
+                card.update(appId=app['id'],name=name,url=url,color=color,layout=layout,ifOpen=policy,activation=activation); self.save()
                 return {'status':'saved','card':copy.deepcopy(card)}
         if path=='/api/cards/delete':
             with self.lock:
@@ -621,7 +624,7 @@ def validate_profile(profile):
         if color not in COLORS: raise ValueError('Color de botón no válido.')
         policy=card.get('ifOpen','reuse')
         if policy not in ('reuse','launch'):raise ValueError('Opción de aplicación abierta no válida.')
-        result['cards'].append({'id':cid,'appId':aid,'name':clean_text(card.get('name','')),'url':windows.validate_url(card.get('url','')),'color':color,'layout':validate_layout(card.get('layout'),True),'ifOpen':policy})
+        result['cards'].append({'id':cid,'appId':aid,'name':clean_text(card.get('name','')),'url':windows.validate_url(card.get('url','')),'color':color,'layout':validate_layout(card.get('layout'),True),'ifOpen':policy,'activation':validate_activation(card.get('activation','front'))})
     for scene in scenes:
         sid=clean_text(scene.get('id',''),64)
         if sid in seen: raise ValueError('Hay identificadores duplicados.')

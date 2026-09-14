@@ -87,7 +87,21 @@ def validate_beta9(out):
     if release.get('version')!=VERSION or not all(release.get(k) for k in ('releaseVerified','installedIntegrityVerified','profileAndPairingPreserved','phoneReconnectedAfterUpdate')):raise RuntimeError('Falta instalación verificada beta9.')
     if copies.get('version')!=VERSION or not all(copies.get(k) for k in ('installedApkMatches','phoneWindowsInstallerMatches','phoneDocumentationMatches')):raise RuntimeError('Faltan copias verificadas beta9.')
 
+def validate_beta10(out):
+    def report(name):return json.loads((out/('beta10-'+name+'.json')).read_text(encoding='utf-8-sig'))
+    for name,minimum in [('core-tests',224),('launch-ui',15),('visual-tests',55),('launch-live',10)]:
+        item=report(name)
+        if not item.get('passed') or item.get('testsRun',item.get('count',0))<minimum or item.get('sourceHashes')!=product_sources():raise RuntimeError('Falta evidencia actual beta10: '+name)
+    if not report('launch-live').get('originalProfileUnchanged'):raise RuntimeError('La rutina original no quedó preservada en las pruebas.')
+    android=report('android-installed-tests')
+    if not android.get('passed') or android.get('installedVersion')!=VERSION or android.get('cycles',0)<3 or android.get('checks',0)<24 or android.get('basicAssertions',0)<63:raise RuntimeError('Falta instrumentación Android actual beta10.')
+    release=report('release-verification');copies=report('final-device-verification');phone=report('phone-launch-tests')
+    if release.get('version')!=VERSION or not all(release.get(k) for k in ('releaseVerified','installedIntegrityVerified','profileAndPairingPreserved','phoneReconnectedAfterUpdate')):raise RuntimeError('Falta verificar instalación beta10.')
+    if copies.get('version')!=VERSION or not all(copies.get(k) for k in ('installedApkMatches','phoneWindowsInstallerMatches','phoneDocumentationMatches')):raise RuntimeError('Faltan copias verificadas beta10.')
+    if not phone.get('passed') or phone.get('version')!=VERSION or phone.get('installedApkSHA256')!=hashlib.sha256((out/'EddyDeck-Android.apk').read_bytes()).hexdigest():raise RuntimeError('Falta comprobar el menú en el Android instalado.')
+
 def validate_completed(out):
+    if VERSION=='2.2.8-beta.10':return validate_beta10(out)
     if VERSION=='2.2.7-beta.9':return validate_beta9(out)
     if VERSION=='2.2.6-beta.8':return validate_beta8(out)
     if VERSION=='2.2.5-beta.7':return validate_beta7(out)
