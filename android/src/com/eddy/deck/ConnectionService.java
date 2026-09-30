@@ -43,7 +43,12 @@ public class ConnectionService extends Service {
                 JSONObject s=connections.api(new JSONObject().put("pcId",boot.getString("pcId")).put("path","/api/heartbeat").put("method","GET"));
                 text="Conectado · "+s.optString("name","Tu PC");
             }
-        }catch(Exception e){SupportReports.record(this,"background-connect","failed",e);text="Esperando a tu PC · reintento automático";error=e.getMessage();}
+        }catch(Exception e){
+            SupportReports.record(this,"background-connect","failed",e);error=e.getMessage();
+            if(e instanceof Connections.Unreachable)text=((Connections.Unreachable)e).brief;
+            else if(e instanceof javax.net.ssl.SSLException)text="Respondió otra copia de Eddy Deck · revisa la PC";
+            else text="Esperando a tu PC · reintento automático";
+        }
         if(destroyed)return;
         getSharedPreferences("deck-options",0).edit().putString("backgroundError",error).putString("backgroundStatus",text).putLong("backgroundAt",System.currentTimeMillis()).apply();
         getSystemService(NotificationManager.class).notify(24,notification(text));

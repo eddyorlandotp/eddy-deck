@@ -5,6 +5,29 @@ from PIL import Image,ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 
+def write_version_info():
+    """Standard Windows version resource. Unsigned binaries without any
+    publisher or product metadata look more suspicious to antivirus models."""
+    sys.path.insert(0,str(ROOT))
+    from companion.core import VERSION
+    from companion.resilience import version_key
+    major,minor,patch,_,pre=version_key(VERSION)
+    numbers=(major,minor,patch,pre)
+    text=f'''VSVersionInfo(
+  ffi=FixedFileInfo(filevers={numbers},prodvers={numbers},mask=0x3f,flags=0x0,OS=0x40004,fileType=0x1,subtype=0x0,date=(0,0)),
+  kids=[StringFileInfo([StringTable('0C0A04B0',[
+    StringStruct('CompanyName','Eddy Orlando'),
+    StringStruct('FileDescription','Eddy Deck - control de tu PC desde tu celular'),
+    StringStruct('FileVersion','{VERSION}'),
+    StringStruct('InternalName','EddyDeck'),
+    StringStruct('LegalCopyright','MIT License'),
+    StringStruct('OriginalFilename','EddyDeck.exe'),
+    StringStruct('ProductName','Eddy Deck'),
+    StringStruct('ProductVersion','{VERSION}')])]),
+  VarFileInfo([VarStruct('Translation',[0x0C0A,1200])])])
+'''
+    path=ROOT/'.build'/'version_info.txt';path.write_text(text,encoding='utf-8');return path
+
 def main():
     sys.path.insert(0,str(ROOT))
     from scripts.sign_release import prepare_key,sign
@@ -17,7 +40,8 @@ def main():
     for x,y in ((55,55),(142,55),(55,142)):d.rounded_rectangle((x,y,x+60,y+60),radius=15,fill='white')
     d.polygon([(146,138),(207,172),(146,207)],fill='white')
     img.save(ROOT/'ui/app.ico',sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
-    command=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--name','EddyDeck','--icon',str(ROOT/'ui/app.ico'),
+    version_file=write_version_info()
+    command=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--windowed','--name','EddyDeck','--icon',str(ROOT/'ui/app.ico'),'--version-file',str(version_file),
              '--distpath',str(ROOT/'artifacts/windows'),'--workpath',str(ROOT/'.build/pyinstaller'),'--specpath',str(ROOT/'.build'),
              '--add-data',str(ROOT/'ui')+';ui','--hidden-import','win32com.client','--hidden-import','win32timezone',
              '--collect-submodules','pystray',str(ROOT/'run.py')]
@@ -32,6 +56,8 @@ def main():
     build_tidal(output/'EddyDeck-Tidal.exe')
     from scripts.build_media import build as build_media
     build_media(output/'EddyDeck-Media.exe')
+    from scripts.build_audio import build as build_audio
+    build_audio(output/'EddyDeck-Audio.exe')
     (output/'Instalar.cmd').write_text('@echo off\r\nif not exist "%~dp0EddyDeck-Compatibilidad.exe" (\r\n echo Falta el comprobador. Extrae el ZIP completo de Eddy Deck.\r\n pause\r\n exit /b 1\r\n)\r\nstart "" "%~dp0EddyDeck-Compatibilidad.exe"\r\n',encoding='ascii')
     shutil.copy2(ROOT/'README.md',output/'LEEME.md')
     shutil.copy2(ROOT/'LICENSE',output/'LICENSE.txt')

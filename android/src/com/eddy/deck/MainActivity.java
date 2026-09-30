@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
                 String path=uri.getPath();
                 if(!"https".equals(uri.getScheme())||!"app.eddydeck.local".equals(uri.getHost()))return blocked();
                 if(path==null||path.equals("/"))path="/index.html";
-                if(!path.matches("/(index\\.html|app\\.js|extended\\.js|beta2\\.js|pickers\\.js|manual\\.js|styles\\.css|icon\\.svg)"))return blocked();
+                if(!path.matches("/(index\\.html|audio\\.js|app\\.js|extended\\.js|beta2\\.js|pickers\\.js|manual\\.js|styles\\.css|icon\\.svg)"))return blocked();
                 String mime=path.endsWith(".html")?"text/html":path.endsWith(".js")?"text/javascript":path.endsWith(".css")?"text/css":"image/svg+xml";
                 try{
                     HashMap<String,String> headers=new HashMap<>();
@@ -319,6 +319,7 @@ public class MainActivity extends Activity {
                 connections.put(new JSONObject().put("host",host).put("lan",lan).put("fingerprint",fp).put("token",response.getString("token")).put("deviceId",response.getString("deviceId")).put("name",response.getString("name")));
                 candidate=null;return connections.bootstrap();
             }
+            case "wake":return connections.wake(body.getString("pcId"));
             case "api":{
                 return connections.api(body);
             }

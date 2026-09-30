@@ -19,7 +19,6 @@ def restore_profile_backup(file,data):
     return {'cards':len(profile['cards']),'routines':len(profile['scenes'])}
 
 def install_from(source):
-    import pythoncom,win32com.client
     source=Path(source).resolve()
     from companion.integrity import verify_release,cache_release,CHECKER
     verify_release(source)
@@ -65,21 +64,18 @@ def install_from(source):
         except OSError:
             if swapped and not target.exists():os.replace(previous,target)
             raise RuntimeError('Windows no pudo sustituir la aplicación. Cierra Eddy Deck antes de actualizar.') from None
-    pythoncom.CoInitialize()
-    try:
-        shell=win32com.client.Dispatch('WScript.Shell')
-        desktop=Path(shell.SpecialFolders('Desktop'))
-        programs=Path(os.environ['APPDATA'])/'Microsoft/Windows/Start Menu/Programs'
-        for directory in (desktop,programs):
-            directory.mkdir(parents=True,exist_ok=True)
-            link=shell.CreateShortcut(str(directory/'Eddy Deck.lnk'))
-            link.TargetPath=str(target/'EddyDeck.exe');link.WorkingDirectory=str(target)
-            link.IconLocation=str(target/'EddyDeck.exe');link.Description='Controla tu PC desde Android, sin IA ni suscripciones.';link.Save()
-        repair=shell.CreateShortcut(str(desktop/'Eddy Deck - Reparar.lnk'))
-        repair.TargetPath=str(data/'Rescue'/CHECKER);repair.Arguments='--repair';repair.Description='Comprueba y restaura los archivos de Eddy Deck conservando tus datos.';repair.Save()
-    finally:
-        link=None;repair=None;shell=None
-        pythoncom.CoUninitialize()
+    from companion import resilience
+    # Rollback copies keep their files, but their executable can no longer be
+    # started by a shortcut or a search. The verified ZIP in recovery restores.
+    resilience.disable_stale_copies(target.parent)
+    # Fresh shortcuts without link tracking: they cannot drift to a
+    # previous copy if the executable is ever missing.
+    description='Controla tu PC desde Android, sin IA ni suscripciones.'
+    resilience.write_shortcut(resilience.desktop_link(),target/'EddyDeck.exe','',description)
+    resilience.write_shortcut(resilience.menu_link(),target/'EddyDeck.exe','',description)
+    resilience.write_shortcut(resilience.desktop_link().with_name('Eddy Deck - Reparar.lnk'),data/'Rescue'/CHECKER,'--repair','Comprueba y restaura los archivos de Eddy Deck conservando tus datos.')
+    if resilience.startup_wanted(data):
+        resilience.write_shortcut(resilience.startup_link(),target/'EddyDeck.exe','--tray','Inicia Eddy Deck junto al reloj.')
     return target
 
 def main():

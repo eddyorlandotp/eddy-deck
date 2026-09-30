@@ -2,6 +2,19 @@
 
 Si una aplicación bloquea su ventana principal con un aviso o diálogo, Eddy Deck lo señala y conserva esa decisión pendiente. No intenta mover ni cerrar esa ventana desde los controles normales.
 
+## Conexión que se repara sola · beta 12
+
+- **El celular te dice por qué no conecta.** En lugar de solo "Reconectando", verás una de estas causas:
+  - *Tu PC está encendida y responde, pero Eddy Deck no está abierto o Windows lo bloqueó*: abre Eddy Deck en la PC. Si no arranca, revisa **Seguridad de Windows → Historial de protección**.
+  - *Tailscale está desconectado en este celular*: actívalo para llegar a tu PC fuera de casa.
+  - *Respondió otra copia de Eddy Deck*: en la PC cierra esa copia y abre el acceso **Eddy Deck** del escritorio.
+  - *No encuentro tu PC*: puede estar apagada, suspendida o sin Tailscale.
+- **Un vigilante en Windows** revisa cada cinco minutos que Eddy Deck esté activo. Si se cerró por un fallo, lo vuelve a abrir (hasta tres veces por hora). Si pulsaste **Salir**, respeta tu decisión hasta el siguiente inicio de Windows. Si falta el programa porque un antivirus lo quitó, **no lo reinstala por su cuenta**: te muestra un aviso para que decidas tú. Se crea al activar **Iniciar Eddy Deck al entrar a Windows** y se quita al desactivarlo. En el Programador de tareas aparece como *Eddy Deck - Vigilante* y no usa permisos de administrador.
+- **Los accesos directos se corrigen solos** al abrir Eddy Deck, y ya no pueden "saltar" a una versión antigua. Las copias antiguas junto al programa ya no se pueden abrir por error: su `EddyDeck.exe` pasa a llamarse `EddyDeck.exe.anterior`. Las copias verificadas de `recovery` siguen sirviendo para reparar.
+- Si abres una versión antigua a mano, se abre la versión instalada en su lugar.
+- El supervisor ya no reinicia el receptor por pausas cortas (por ejemplo, mientras un juego satura la PC). Solo lo reinicia tras 45 segundos seguidos sin respuesta, y anota qué falló.
+- Recomendado si usas Microsoft Defender: en **Seguridad de Windows → Protección contra virus y amenazas → Administrar la configuración → Exclusiones**, agrega la carpeta `%LOCALAPPDATA%\Programs\EddyDeck`. Eddy Deck no cambia esa configuración por ti.
+
 ## Actualizaciones, menús y fiabilidad · beta 11
 
 - Todos los selectores, incluido **Reproductor** en Música, usan el mismo menú. Con muchas opciones aparece búsqueda. Atrás cierra solo las opciones. La actualización automática del estado no interrumpe una elección abierta.
@@ -174,7 +187,20 @@ Abre TIDAL en Windows y carga música. El botón central reproduce o pausa; Paus
 
 El control directo reconoce el reproductor de TIDAL en español o inglés. Si TIDAL cambia su interfaz, está iniciando sesión o no expone los botones, Eddy Deck lo indica; no vuelve a enviar a ciegas la orden a otra app. Si una orden tarda demasiado, revisa el estado antes de repetirla. Siguiente/anterior comprueban un cambio de identidad de pista; TIDAL espera además que termine su transición antes de aceptar la siguiente pausa. Anterior puede volver al inicio de la misma canción. Si no se observa el efecto a tiempo, aparece un aviso; no se reenvía la orden automáticamente.
 
-En **Inicio → A un toque**, **Menos volumen**, **Más volumen** y **Silenciar** controlan el volumen general de Windows. No preguntan en qué pantalla quieres actuar. En Música, TIDAL y Automático muestran Volumen general de Windows: Bajar, Subir y Silenciar PC afectan todo el audio del sistema. No ajustan solo TIDAL. AIMP directo sí tiene volumen propio; puedes arrastrar su barra sin que las actualizaciones periódicas la devuelvan al valor anterior. «Silenciar / activar» alterna entre silencio y sonido. Un reproductor que no admite Detener muestra Pausar cuando dispone de esa operación. En las rutinas, silencio también es global salvo que el destino sea AIMP.
+En **Inicio → A un toque** y **Música → Sonido de tu PC**, elige **Salida de sonido** para usar altavoces, monitor o audífonos conectados. La lista usa los nombres que muestra Windows. La selección cambia la salida general y multimedia; conserva el dispositivo de comunicaciones. Si una app fijó su propia salida o usa audio exclusivo, cambia también su ajuste interno: Eddy Deck no fuerza esa ruta.
+
+Arrastra la **barra de volumen** entre 0 y 100 %. Se aplica al soltarla, sin enviar una orden por cada movimiento. El porcentaje muestra el volumen real de Windows. El botón junto a la barra silencia o activa el sonido; mover la barra no quita el silencio. AIMP directo conserva además su barra independiente. Si desconectas la salida o cambias de PC durante el ajuste, vuelve a elegir el control: los cambios pendientes no deben aplicarse a otro dispositivo. En las rutinas se conservan sus pasos de volumen existentes.
+
+## Encender o despertar por LAN
+
+1. Conecta una vez el celular a la PC con esta versión para guardar automáticamente sus datos de red dentro de la vinculación cifrada.
+2. Mantén la PC conectada a la corriente, preferiblemente por Ethernet al router, y el celular al mismo Wi-Fi/red local. Activa Wake-on-LAN o Power On by PCI-E en BIOS/UEFI y Wake on Magic Packet en el controlador, si el equipo los ofrece.
+3. Pulsa **Encender por LAN** en Inicio, Mi PC o la pantalla de reconexión; después **Enviar señal de encendido**. La aplicación seguirá intentando conectarse a la PC vinculada.
+4. **Señal enviada** significa que Android pudo enviarla; no confirma que la PC haya encendido. Arrancar desde apagado, suspensión o hibernación depende del equipo, la BIOS y su energía. Esta entrega no certifica un arranque real desde apagado.
+
+Si cambias de router o tarjeta de red, conecta de nuevo la PC encendida para renovar los datos. La app limita los envíos a una red física privada que coincida con la guardada; una red de invitados o aislamiento entre clientes puede bloquearlos. No se cambia la configuración del router ni de la BIOS automáticamente. En esta PC se observó Ethernet habilitado para Magic Packet, pero falta la prueba física de encendido.
+
+**Fuera de casa:** los datos móviles y Tailscale solos no pueden despertar una PC apagada. Haría falta otro equipo encendido en la red de casa para enviar la señal; esta versión no incorpora ese intermediario. Cuando Windows ya está encendido, la reconexión por Tailscale sigue funcionando como antes. Una VPN con bloqueo de conexiones fuera del túnel puede impedir incluso el envío local: la app lo informa, no desactiva esa protección.
 
 Apagar, reiniciar, suspender y bloquear piden confirmación. Después hay una cuenta atrás de 15 segundos que puedes cancelar desde el celular o el icono de Eddy Deck en Windows. Confirmar una acción de energía cancela los pasos pendientes de rutinas y detiene nuevas aperturas durante la espera.
 
@@ -265,7 +291,8 @@ Si la versión del celular y la de Windows son distintas, verás un aviso y un a
 
 ## 14. Cuando algo no funciona
 
-- **No conecta:** comprueba que Windows esté despierto, Eddy Deck activo y Tailscale conectado. Reabre la app, espera los intentos de reconexión y consulta el informe.
+- **No conecta:** lee la causa que muestra el celular en la pantalla de reconexión. Comprueba que Windows esté despierto, Eddy Deck activo y Tailscale conectado en ambos equipos. Reabre la app, espera los intentos de reconexión y consulta el informe.
+- **Eddy Deck desapareció de la PC o no abre:** revisa **Seguridad de Windows → Historial de protección**. Si un antivirus lo puso en cuarentena, restáuralo o permítelo y usa el acceso **Eddy Deck - Reparar**. El vigilante te avisa, pero no lo reinstala sin ti.
 - **Una app no aparece:** sincroniza Biblioteca; si es portable, agrégala desde Windows. Los desinstaladores y herramientas peligrosas pueden estar excluidos.
 - **Se abrió, pero no se movió:** revisa si quedó un lanzador, varias ventanas, un permiso o una actualización. Elige la ventana exacta en Mi PC. Prueba modo ventana desde el juego.
 - **Un monitor desapareció:** pulsa Actualizar en Mi PC y comprueba la disposición de Windows. Configura la alternativa a Principal en la rutina.

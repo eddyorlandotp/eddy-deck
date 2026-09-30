@@ -6,7 +6,7 @@ from companion.core import VERSION
 
 def product_sources():
     paths=list((ROOT/'companion').glob('*.py'))+list((ROOT/'android/src').rglob('*.java'))
-    paths += [ROOT/'run.py',ROOT/'installer/Compatibility.cs',ROOT/'installer/GitHubUpdate.cs',ROOT/'android/AndroidManifest.xml',ROOT/'android/res/values/styles.xml',*list((ROOT/'companion').glob('*.cs'))]+[ROOT/'ui'/name for name in ('app.js','extended.js','beta2.js','pickers.js','styles.css','index.html')]
+    paths += [ROOT/'run.py',ROOT/'installer/Compatibility.cs',ROOT/'installer/GitHubUpdate.cs',ROOT/'android/AndroidManifest.xml',ROOT/'android/res/values/styles.xml',*list((ROOT/'companion').glob('*.cs'))]+[ROOT/'ui'/name for name in ('app.js','audio.js','extended.js','beta2.js','pickers.js','styles.css','index.html')]
     return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 
 def validate_beta5(out):
@@ -126,7 +126,24 @@ def validate_beta11(out):
     resolution=report('review-resolution')
     if resolution.get('rounds')!=1 or not resolution.get('readOnly') or not resolution.get('resolutions'):raise RuntimeError('Falta resolución de la revisión de Claude.')
 
+def validate_beta13(out):
+    def report(name):return json.loads((out/('beta13-'+name+'.json')).read_text(encoding='utf-8-sig'))
+    for name,minimum,field in [('core-tests',283,'testsRun'),('audio-live',5,'count'),('ui-tests',12,'count')]:
+        item=report(name)
+        if not item.get('passed') or item.get(field,0)<minimum or item.get('sourceHashes')!=product_sources():raise RuntimeError('Falta evidencia actual beta13: '+name)
+    audio=report('audio-live')
+    if not audio.get('initialStateRestored'):raise RuntimeError('Falta restaurar audio real.')
+    phone=report('phone-tests')
+    if not phone.get('passed') or phone.get('version')!=VERSION or not all(phone.get('checks',{}).get(k) for k in ('musicSliderChangesRealVolume','musicMuteChangesRealMute','musicUnmuteChangesRealMute','musicOriginalSoundRestored','styledOutputPickerChangesRealEndpoint','outputRestoredFromPhone','homeSliderChangesRealVolume','wakeSignalSubmitted')):raise RuntimeError('Faltan controles visibles del Samsung beta13.')
+    if phone.get('installedApkSHA256')!=hashlib.sha256((out/'EddyDeck-Android.apk').read_bytes()).hexdigest():raise RuntimeError('Las pruebas del Samsung no corresponden al APK final.')
+    android=report('android-installed-tests')
+    if not android.get('passed') or android.get('installedVersion')!=VERSION or android.get('basicAssertions',0)<115:raise RuntimeError('Falta instrumentación Android actual.')
+    release=report('release-verification');copies=report('final-device-verification')
+    if release.get('version')!=VERSION or not all(release.get(k) for k in ('releaseVerified','installedIntegrityVerified','profileAndPairingPreserved','phoneReconnectedAfterUpdate','audioHelperSignedAndInstalled')):raise RuntimeError('Falta comprobar instalación beta13.')
+    if copies.get('version')!=VERSION or not all(copies.get(k) for k in ('installedApkMatches','phoneWindowsInstallerMatches','phoneDocumentationMatches')):raise RuntimeError('Faltan copias verificadas beta13.')
+
 def validate_completed(out):
+    if VERSION=='2.2.11-beta.13':return validate_beta13(out)
     if VERSION=='2.2.9-beta.11':return validate_beta11(out)
     if VERSION=='2.2.8-beta.10':return validate_beta10(out)
     if VERSION=='2.2.7-beta.9':return validate_beta9(out)

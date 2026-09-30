@@ -1,4 +1,4 @@
-# Publicación · Eddy Deck 2.2.9-beta.11
+# Publicación · Eddy Deck 2.2.11-beta.13
 
 GitHub Releases distribuye los instaladores oficiales de esta beta: Windows, Android y el manifiesto de descarga firmado. El comprobador usa ese origen; no necesita acceso a una cuenta ni al respaldo privado de Drive. Solo descarga entregas completas y verifica su contenido antes de ofrecer instalarlo.
 

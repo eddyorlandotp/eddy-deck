@@ -7,6 +7,6 @@ def build(output):
     _,mod,_=prepare_key();source=(ROOT/'installer/Compatibility.cs').read_text(encoding='utf-8').replace('@@VERSION@@',VERSION).replace('@@MODULUS@@',mod)
     dest=ROOT/'.build/Compatibility.cs';dest.write_text(source,encoding='utf-8')
     csc=Path('C:/Windows/Microsoft.NET/Framework/v4.0.30319/csc.exe')
-    subprocess.run([str(csc),'/nologo','/target:winexe','/platform:anycpu','/optimize+','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll','/r:System.IO.Compression.dll','/r:System.IO.Compression.FileSystem.dll','/out:'+str(output),str(dest),str(ROOT/'installer/GitHubUpdate.cs')],check=True,cwd=ROOT)
+    subprocess.run([str(csc),'/nologo','/target:winexe','/platform:anycpu','/optimize+','/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll','/r:System.IO.Compression.dll','/r:System.IO.Compression.FileSystem.dll','/out:'+str(output),str(dest),str(ROOT/'installer/GitHubUpdate.cs'),str(ROOT/'installer/Watchdog.cs')],check=True,cwd=ROOT)
     print('Comprobador independiente compilado.')
 if __name__=='__main__':build(ROOT/'.build/EddyDeck-Compatibilidad.exe')

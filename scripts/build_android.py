@@ -34,7 +34,7 @@ def main():
         if target.parent!=BUILD.resolve():raise RuntimeError('Directorio de compilación no válido.')
         if target.exists():shutil.rmtree(target)
     for folder in ('gen','classes','dex','assets/ui'):(BUILD/folder).mkdir(parents=True,exist_ok=True)
-    for name in ('index.html','styles.css','app.js','extended.js','beta2.js','pickers.js','manual.js','icon.svg'):shutil.copy2(ROOT/'ui'/name,BUILD/'assets/ui'/name)
+    for name in ('index.html','styles.css','audio.js','app.js','extended.js','beta2.js','pickers.js','manual.js','icon.svg'):shutil.copy2(ROOT/'ui'/name,BUILD/'assets/ui'/name)
     program=ARTIFACTS/'windows/EddyDeck'
     if not (program/'EddyDeck.exe').is_file():raise RuntimeError('Compila Windows primero para incluir su instalador en Android.')
     with zipfile.ZipFile(BUILD/'assets/EddyDeck-Windows.zip','w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:

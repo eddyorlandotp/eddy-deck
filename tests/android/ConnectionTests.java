@@ -12,6 +12,24 @@ public class ConnectionTests extends Instrumentation {
     int count=0;
     Bundle args;
     void check(boolean okay,String name)throws Exception{if(!okay)throw new Exception(name);count++;}
+    void wakeChecks()throws Exception{
+        java.net.SocketException policy=new java.net.SocketException("blocked");policy.initCause(new android.system.ErrnoException("bind",android.system.OsConstants.EPERM));check(WakeOnLan.permissionDenied(policy),"Only explicit network permission denial uses normal OS route");
+        check(!WakeOnLan.permissionDenied(new java.net.SocketException("network lost")),"Network loss never selects an alternative route");
+        byte[] packet=WakeOnLan.magic("02:11:22:33:44:55");check(packet.length==102,"Magic packet length");
+        for(int i=0;i<6;i++)check((packet[i]&255)==255,"Magic packet prefix");
+        for(int i=0;i<16;i++)check(java.util.Arrays.equals(java.util.Arrays.copyOfRange(packet,6+6*i,12+6*i),new byte[]{2,17,34,51,68,85}),"Magic packet repeats exact MAC");
+        for(String mac:new String[]{"FF:FF:FF:FF:FF:FF","03:11:22:33:44:55","00:00:00:00:00:00","02-11-22-33-44-55","localhost"}){boolean rejected=false;try{WakeOnLan.magic(mac);}catch(Exception e){rejected=true;}check(rejected,"Invalid wake MAC rejected");}
+        JSONObject net=new JSONObject().put("name","Test LAN").put("mac","02:11:22:33:44:55").put("address","192.168.8.12").put("prefix",24).put("broadcast","192.168.8.255").put("ethernet",true);
+        check(WakeOnLan.validate(net).getString("broadcast").equals("192.168.8.255"),"Broadcast derived and checked");
+        check(WakeOnLan.sameLAN(net,"192.168.8.15",24),"Physical same LAN accepted");
+        check(!WakeOnLan.sameLAN(net,"192.168.9.15",24),"Different LAN rejected");
+        check(!WakeOnLan.sameLAN(net,"100.64.0.12",24),"Tailscale route not LAN");
+        check(!WakeOnLan.sameLAN(net,"192.168.8.15",32),"Host-only route safely skipped");
+        check(!WakeOnLan.sameLAN(net,"192.168.8.12",24),"Same address as PC rejected");
+        check(WakeOnLan.validated(new org.json.JSONArray().put(net).put(net)).length()==1,"Duplicate packets bounded by adapter");
+        for(String ip:new String[]{"8.8.8.8","127.0.0.1","192.168.008.12","::1","example.test"}){JSONObject bad=new JSONObject(net.toString()).put("address",ip);boolean rejected=false;try{WakeOnLan.validate(bad);}catch(Exception e){rejected=true;}check(rejected,"Non-LAN or malformed wake address rejected");}
+        JSONObject bad=new JSONObject(net.toString()).put("broadcast","8.8.8.8");boolean rejected=false;try{WakeOnLan.validate(bad);}catch(Exception e){rejected=true;}check(rejected,"Cannot override broadcast with Internet target");
+    }
     @Override public void onCreate(Bundle b){super.onCreate(b);args=b;start();}
     @Override public void onStart(){
         Bundle result=new Bundle();
@@ -52,6 +70,20 @@ public class ConnectionTests extends Instrumentation {
                 output.put("originalSavedRoutesRestored",live.active().getString("host").equals(original.getString("host")));
                 result.putString("stream",output.toString());finish(-1,result);return;
             }
+            if(args!=null&&"wake-diagnose".equals(args.getString("mode"))){
+                org.json.JSONArray rows=new org.json.JSONArray();android.net.ConnectivityManager cm=getTargetContext().getSystemService(android.net.ConnectivityManager.class);
+                for(android.net.Network network:cm.getAllNetworks()){
+                    android.net.NetworkCapabilities caps=cm.getNetworkCapabilities(network);if(caps==null||caps.hasTransport(4)||!caps.hasTransport(1))continue;
+                    android.net.LinkProperties prop=cm.getLinkProperties(network);if(prop==null)continue;
+                    for(android.net.LinkAddress local:prop.getLinkAddresses())if(local.getAddress() instanceof java.net.Inet4Address){
+                        for(boolean bind:new boolean[]{true,false}){JSONObject row=new JSONObject().put("explicitNetwork",bind);String stage="create";
+                            try(java.net.DatagramSocket s=new java.net.DatagramSocket(null)){stage="network-bind";if(bind)network.bindSocket(s);stage="broadcast";s.setBroadcast(true);stage="local-bind";s.bind(new java.net.InetSocketAddress(local.getAddress(),0));row.put("ok",true);}
+                            catch(Exception e){row.put("ok",false).put("stage",stage).put("error",e.getClass().getSimpleName()+": "+e.getMessage());}rows.put(row);
+                        }
+                    }
+                }
+                result.putString("stream",rows.toString());finish(-1,result);return;
+            }
             if(args!=null&&"live-status".equals(args.getString("mode"))){
                 Connections live=new Connections(getTargetContext());
                 JSONObject state=live.api(new JSONObject().put("pcId",live.bootstrap().getString("pcId")).put("path","/api/state").put("method","GET"));
@@ -72,6 +104,7 @@ public class ConnectionTests extends Instrumentation {
                 try{output.put("eddyTLS",MainActivity.request(args.getString("host"),47990,args.getString("fingerprint"),"","/health","GET",null,false).has("version"));}catch(Exception e){output.put("eddyError",e.getClass().getSimpleName()+": "+e.getMessage());}
                 result.putString("stream",output.toString());finish(-1,result);return;
             }
+            wakeChecks();
             String prefix="eddy-test-"+System.nanoTime()+"-";
             Context isolated=new ContextWrapper(getTargetContext()){
                 @Override public Context getApplicationContext(){return this;}
@@ -91,6 +124,13 @@ public class ConnectionTests extends Instrumentation {
             c.select(a);check(c.active().getString("token").equals("legacy-test-token"),"Switch restores first token");
             try{c.api(new JSONObject().put("pcId",b).put("path","/api/media").put("method","POST"));throw new Exception("Cross-PC request accepted");}catch(Exception e){check(e.getMessage().contains("Cambiaste"),"Stale request rejected before network");}
             Connections reopened=new Connections(isolated);check(reopened.active().getString("id").equals(a),"Reopen preserves active PC");
+            try{reopened.wake(b);throw new Exception("Stale wake accepted");}catch(Exception e){check(e.getMessage().contains("Selecciona"),"Stale PC wake rejected before sending");}
+            JSONObject adapter=new JSONObject().put("name","Ethernet").put("mac","02:11:22:33:44:55").put("address","192.168.8.12").put("prefix",24).put("broadcast","192.168.8.255");
+            Connections wakeRemember=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->new JSONObject().put("wake",new JSONObject().put("adapters",new org.json.JSONArray().put(adapter))),context->new org.json.JSONArray());
+            wakeRemember.api(new JSONObject().put("pcId",a).put("path","/api/state").put("method","GET"));
+            check(new Connections(isolated).bootstrap().getBoolean("wakeReady"),"Authenticated wake data survives reopen");
+            check(!reopened.bootstrap().toString().contains("02:11:22"),"Wake hardware stays in encrypted native vault");
+            c.select(b);check(!c.bootstrap().getBoolean("wakeReady"),"Wake data isolated per PC");c.select(a);
             reopened.update(a,"vpn","100.81.0.1");check(reopened.active().getString("vpn").equals("100.81.0.1"),"VPN endpoint persisted");
             reopened.forget();check(reopened.bootstrap().getJSONArray("pcs").length()==1,"Forget one PC only");check(reopened.active().getString("token").equals("second-test-token"),"Other PC survives forget");
             for(String host:new String[]{"127.0.0.1","192.168.1.12","10.0.0.2","100.64.0.1","100.127.255.254"})check(MainActivity.validHost(host).equals(host),"Private endpoint accepted");
@@ -114,6 +154,38 @@ public class ConnectionTests extends Instrumentation {
             final int[] discoveries={0};Connections offline=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{throw new java.net.ConnectException("offline");},context->{discoveries[0]++;return new org.json.JSONArray();});
             try{offline.api(command);}catch(java.net.ConnectException expected){}
             check(discoveries[0]==1,"Offline command may discover before dispatch, without sending a POST");
+            // Beta 12: explain the failure. Windows drops TCP to a closed port, so
+            // "PC on, Eddy Deck closed" is detected by ICMP; probes are injected here.
+            JSONObject beat=new JSONObject().put("pcId",b).put("path","/api/heartbeat").put("method","GET");
+            c.update(b,"vpn","100.81.0.1");
+            final java.util.ArrayList<String> pinged=new java.util.ArrayList<>();
+            Connections.Prober pcOn=new Connections.Prober(){public boolean reachable(String h,int t){pinged.add(h);return h.equals("100.81.0.1")&&t>0&&t<=1500;}public boolean vpnActive(Context x){return true;}};
+            Connections.networkChanged();
+            Connections receiverDown=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{throw new java.net.SocketTimeoutException("closed port dropped");},context->new org.json.JSONArray(),pcOn);
+            try{receiverDown.api(beat);throw new Exception("Offline heartbeat succeeded");}catch(Connections.Unreachable e){check(e.kind.equals("receiver-down")&&e.getMessage().contains("Eddy Deck no está abierto"),"PC answering ping but not Eddy Deck is reported as closed receiver");}
+            check(pinged.size()==1&&pinged.get(0).equals("100.81.0.1"),"Diagnosis probes the private VPN route first and stops at the first answer");
+            pinged.clear();Connections.networkChanged();
+            Connections refusedPc=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{
+                if(host.startsWith("127."))throw new java.net.ConnectException("ECONNREFUSED (Connection refused)");
+                if(host.equals("192.168.1.13"))throw new java.net.ConnectException("failed to connect to /192.168.1.13 (port 47990): connect failed: ECONNREFUSED (Connection refused)");
+                throw new java.net.SocketTimeoutException("timeout");
+            },context->new org.json.JSONArray(),pcOn);
+            try{refusedPc.api(beat);}catch(Connections.Unreachable e){check(e.kind.equals("receiver-down")&&pinged.isEmpty(),"A refusal from the PC itself needs no extra probe");}
+            Connections.networkChanged();
+            Connections.Prober silent=new Connections.Prober(){public boolean reachable(String h,int t){return false;}public boolean vpnActive(Context x){return true;}};
+            Connections loopbackOnly=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{
+                if(host.startsWith("127."))throw new java.net.ConnectException("ECONNREFUSED (Connection refused)");throw new java.net.SocketTimeoutException("timeout");
+            },context->new org.json.JSONArray(),silent);
+            try{loopbackOnly.api(beat);}catch(Connections.Unreachable e){check(e.kind.equals("unreachable"),"A loopback refusal without USB never claims the PC is on");}
+            Connections.networkChanged();
+            Connections.Prober vpnOff=new Connections.Prober(){public boolean reachable(String h,int t){return false;}public boolean vpnActive(Context x){return false;}};
+            Connections noTailscale=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{throw new java.net.SocketTimeoutException("timeout");},context->new org.json.JSONArray(),vpnOff);
+            try{noTailscale.api(beat);}catch(Connections.Unreachable e){check(e.kind.equals("vpn-off")&&e.brief.contains("Tailscale"),"Phone without Tailscale is told to enable it");}
+            Connections.networkChanged();
+            Connections otherIdentity=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{throw new javax.net.ssl.SSLHandshakeException("pin mismatch");},context->new org.json.JSONArray(),pcOn);
+            try{otherIdentity.api(beat);throw new Exception("Wrong identity accepted");}catch(javax.net.ssl.SSLHandshakeException e){check(e.getMessage().contains("otra copia de Eddy Deck"),"Wrong identity names the old-copy cause and keeps the pairing");}
+            check(c.active().getString("fingerprint").equals(b),"Diagnosis never changes the stored identity");
+            c.update(b,"vpn","");
             Connections.networkChanged();
             final int[] verified={0};String newHost="192.168.1.44";
             Connections discoverable=new Connections(isolated,(host,port,pin,token,path,method,payload,probe)->{

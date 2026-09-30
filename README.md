@@ -1,4 +1,19 @@
-# Eddy Deck 2.2.8 · Beta 10
+# Eddy Deck 2.2.11 · Beta 13
+
+Beta 13 añade **salida de sonido de Windows**, **barra de volumen general** en Inicio y Música, y **Encender por LAN** desde Android incluso cuando la PC esté desconectada. Conserva las mejoras de reconexión de beta 12.
+
+El encendido requiere una red local y hardware configurado para Wake-on-LAN; enviar la señal no confirma que haya arrancado. Tailscale solo no despierta equipos apagados desde internet. Consulta [audio, encendido y límites de beta 13](docs/AUDIO-ENCENDIDO-BETA13.md).
+
+
+Beta 12 hace que la conexión se repare sola:
+
+- Los accesos directos ya no pueden saltar a una versión antigua con otra identidad, y se corrigen solos en cada arranque.
+- Las copias anteriores quedan desactivadas.
+- Un vigilante sin permisos de administrador vuelve a abrir Eddy Deck si se cerró por un fallo, y avisa si un antivirus lo quitó. No lo reinstala sin ti.
+- El supervisor tolera pausas cortas de la PC.
+- El celular explica por qué no conecta: PC apagada, Eddy Deck cerrado o bloqueado, Tailscale apagado u otra copia.
+
+Consulta [la resiliencia y sus límites](docs/RESILIENCIA-BETA12.md).
 
 Xbox registra un identificador para abrirse y otro para su ventana. Se añadió la correspondencia exacta, comprobada en su manifiesto instalado, sin asociar otras aplicaciones o widgets de ese paquete.
 
@@ -140,7 +155,7 @@ El catálogo verifica la instalación de los juegos de Steam mediante sus manifi
 
 La carpeta **Escritorio → Eddy Deck** reúne `MANUAL-USUARIO.html`, `GUIA-DE-USO.md`, `PRUEBAS-Y-LIMITES.md`, `Informes` y `Versiones`. Cada versión incluye código fuente, APK e instaladores. Para actualizarla tras compilar y empaquetar ejecuta `scripts/publish_desktop.py`; comprueba las copias y conserva las versiones anteriores. El instalador que lleva Android se actualiza compilando Windows primero.
 
-Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos: `%LOCALAPPDATA%\EddyDeck`.
+Programa: `%LOCALAPPDATA%\Programs\EddyDeck`. Datos: `%USERPROFILE%\.eddydeck` desde beta 9; `%LOCALAPPDATA%\EddyDeck` queda como copia antigua. `preferences.json` guarda el inicio con Windows; `user-exit.json` marca una salida intencional y `watchdog.json` es el estado del vigilante.
 
 | Archivo | Uso |
 | --- | --- |

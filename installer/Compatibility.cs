@@ -207,6 +207,7 @@ class Compatibility : Form {
     }
     [STAThread] static int Main(string[] args){
         try{
+            if(args.Length>=1&&args[0]=="--watchdog")return Watchdog.Run(Data,Installed,args.Length==2&&args[1]=="--dry-run");
             if(args.Length==2&&args[0]=="--download-release"){
                 var report=SystemReport();using(var cancel=new CancellationTokenSource(300000)){
                     try{string folder=GitHubUpdate.Prepare(VersionName,Convert.ToInt32(report["windowsBuild"]),Modulus,DownloadRoot,cancel.Token,x=>{},Verify);report["downloadVerified"]=true;report["source"]=folder;SaveReport(report,args[1]);return 0;}

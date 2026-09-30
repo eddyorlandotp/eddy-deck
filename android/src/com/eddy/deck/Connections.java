@@ -18,13 +18,62 @@ import javax.crypto.spec.GCMParameterSpec;
 final class Connections {
     private static final Object LOCK=new Object();
     private static final java.util.HashMap<String,Long> discoveries=new java.util.HashMap<>();
+    private static long lastWake=0;
     static void networkChanged(){synchronized(LOCK){discoveries.clear();}}
     private final Context context;
     interface Sender{JSONObject request(String host,int port,String pin,String token,String path,String method,JSONObject body,boolean probe)throws Exception;}
     interface Finder{JSONArray discover(Context context)throws Exception;}
-    private final Sender sender;private final Finder finder;
-    Connections(Context c){this(c,MainActivity::request,MainActivity::discoverOn);}
-    Connections(Context c,Sender s,Finder f){context=c.getApplicationContext();sender=s;finder=f;}
+    /** Read-only probes used only to explain a failed connection. */
+    interface Prober{boolean reachable(String host,int timeoutMs);boolean vpnActive(Context context);}
+    /** A failed connection with its most likely cause. Never carries secrets. */
+    static final class Unreachable extends java.net.ConnectException{
+        final String kind,brief;
+        Unreachable(String kind,String brief,String message){super(message);this.kind=kind;this.brief=brief;}
+    }
+    static final Prober SYSTEM_PROBER=new Prober(){
+        public boolean reachable(String host,int timeoutMs){
+            // ICMP echo. Windows drops TCP to a closed port silently, so a
+            // timeout alone cannot tell "PC off" from "Eddy Deck closed".
+            try{return timeoutMs>0&&java.net.InetAddress.getByName(MainActivity.validHost(host)).isReachable(timeoutMs);}catch(Exception e){return false;}
+        }
+        public boolean vpnActive(Context c){
+            try{
+                android.net.ConnectivityManager m=(android.net.ConnectivityManager)c.getSystemService(Context.CONNECTIVITY_SERVICE);
+                for(android.net.Network n:m.getAllNetworks()){android.net.NetworkCapabilities caps=m.getNetworkCapabilities(n);if(caps!=null&&caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN))return true;}
+            }catch(RuntimeException e){return true;}
+            return false;
+        }
+    };
+    private final Sender sender;private final Finder finder;private final Prober prober;
+    Connections(Context c){this(c,MainActivity::request,MainActivity::discoverOn,SYSTEM_PROBER);}
+    /** For injected transports: sends no packets and assumes the VPN is up. */
+    static final Prober NO_PROBES=new Prober(){
+        public boolean reachable(String host,int timeoutMs){return false;}
+        public boolean vpnActive(Context c){return true;}
+    };
+    Connections(Context c,Sender s,Finder f){this(c,s,f,NO_PROBES);}
+    Connections(Context c,Sender s,Finder f,Prober p){context=c.getApplicationContext();sender=s;finder=f;prober=p;}
+    private static boolean refused(java.io.IOException e){
+        String m=String.valueOf(e.getMessage());
+        return e instanceof java.net.ConnectException&&(m.contains("ECONNREFUSED")||m.contains("refused"));
+    }
+    /** Explain why no route answered, using at most two short ICMP probes. */
+    Unreachable diagnose(JSONObject pc,boolean refusedByPc,long deadline){
+        String name=pc.optString("name","tu PC");if(name.isEmpty())name="tu PC";
+        boolean answers=refusedByPc;
+        LinkedHashSet<String> probe=new LinkedHashSet<>();
+        for(String field:new String[]{"vpn","host","lan"}){String h=pc.optString(field);if(!h.isEmpty()&&!h.startsWith("127."))probe.add(h);}
+        int probes=0;
+        for(String host:probe){
+            if(answers||probes>=2)break;
+            long left=deadline-android.os.SystemClock.elapsedRealtime();
+            if(left<300)break;
+            probes++;answers=prober.reachable(host,(int)Math.min(1500,left-200));
+        }
+        if(answers)return new Unreachable("receiver-down","PC encendida · abre Eddy Deck en Windows",name+" está encendida y responde, pero Eddy Deck no está abierto o Windows lo bloqueó. En la PC abre Eddy Deck; si no arranca, revisa Seguridad de Windows → Historial de protección. Reconectaré automáticamente.");
+        if(!pc.optString("vpn").isEmpty()&&!prober.vpnActive(context))return new Unreachable("vpn-off","Tailscale apagado en este celular","Tailscale está desconectado en este celular. Fuera de casa lo necesitas para llegar a "+name+"; actívalo. En casa, revisa también que la PC esté encendida.");
+        return new Unreachable("unreachable","Esperando a tu PC · reintento automático","No encuentro a "+name+". Puede estar apagada, suspendida o sin Tailscale conectado. Reconectaré automáticamente.");
+    }
     private SecretKey key()throws Exception{
         KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);
         if(!ks.containsAlias("eddy-deck-vault")){
@@ -69,7 +118,7 @@ final class Connections {
             list.put(new JSONObject().put("id",item.getString("id")).put("name",item.optString("name","Mi PC")).put("host",item.optString("host")).put("vpn",item.optString("vpn")).put("active",item.getString("id").equals(data.optString("active"))));
         }
         SharedPreferences options=context.getSharedPreferences("deck-options",0);
-        return new JSONObject().put("paired",pc!=null).put("pcId",pc==null?"":pc.getString("id")).put("host",pc==null?"":pc.optString("host")).put("pcs",list).put("background",background()).put("backgroundStatus",options.getString("backgroundStatus","")).put("backgroundError",options.getString("backgroundError","")).put("backgroundAt",options.getLong("backgroundAt",0));
+        return new JSONObject().put("paired",pc!=null).put("pcId",pc==null?"":pc.getString("id")).put("host",pc==null?"":pc.optString("host")).put("pcs",list).put("wakeReady",pc!=null&&pc.optJSONArray("wake")!=null&&pc.optJSONArray("wake").length()>0).put("background",background()).put("backgroundStatus",options.getString("backgroundStatus","")).put("backgroundError",options.getString("backgroundError","")).put("backgroundAt",options.getLong("backgroundAt",0));
     }}
     void put(JSONObject pc)throws Exception{synchronized(LOCK){
         JSONObject data=read();JSONArray list=data.getJSONArray("pcs");String id=pc.getString("fingerprint");pc.put("id",id);
@@ -81,6 +130,13 @@ final class Connections {
     void forget()throws Exception{synchronized(LOCK){JSONObject d=read();JSONArray list=d.getJSONArray("pcs");String active=d.optString("active");for(int i=list.length()-1;i>=0;i--)if(list.getJSONObject(i).getString("id").equals(active))list.remove(i);d.put("active",list.length()==0?"":list.getJSONObject(0).getString("id"));write(d);}}
     void update(String id,String field,String value)throws Exception{synchronized(LOCK){JSONObject d=read();JSONObject pc=find(d,id);if(pc==null)return;pc.put(field,value);write(d);}}
     boolean background(){return context.getSharedPreferences("deck-options",0).getBoolean("background",false);}
+    JSONObject wake(String id)throws Exception{synchronized(LOCK){
+        JSONObject pc=active();if(pc==null||!id.equals(pc.getString("id")))throw new Exception("Selecciona primero la PC que quieres encender.");
+        long now=android.os.SystemClock.elapsedRealtime();if(lastWake!=0&&now-lastWake<5000)throw new Exception("Espera unos segundos antes de enviar otra señal.");
+        lastWake=now;
+        JSONObject result=WakeOnLan.send(context,pc.optJSONArray("wake"));
+        discoveries.clear();return result;
+    }}
     void background(boolean enabled){context.getSharedPreferences("deck-options",0).edit().putBoolean("background",enabled).commit();}
     private void stillSelected(JSONObject pc)throws Exception{
         if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException("La conexión anterior se detuvo para reparar la app.");
@@ -91,6 +147,8 @@ final class Connections {
         try{synchronized(LOCK){
             JSONObject data=read(),pc=find(data,original.getString("id"));if(pc==null)return;
             String before=pc.toString();pc.put("host",host);
+            JSONObject wake=response.optJSONObject("wake");
+            if(wake!=null)try{JSONArray adapters=WakeOnLan.validated(wake.optJSONArray("adapters"));if(adapters.length()>0)pc.put("wake",adapters);}catch(Exception invalid){SupportReports.record(context,"remember-wake","failed",invalid);}
             if(response.has("name"))pc.put("name",response.getString("name"));
             LinkedHashSet<String> routes=new LinkedHashSet<>();
             JSONArray incoming=response.optJSONArray("addresses");
@@ -122,13 +180,17 @@ final class Connections {
         if(saved!=null)for(int i=0;i<Math.min(8,saved.length())&&hosts.size()<7;i++)hosts.add(saved.optString(i));
         hosts.add("127.0.0.1");hosts.remove("");
         long deadline=android.os.SystemClock.elapsedRealtime()+20000;
-        String chosen=null;JSONObject beat=null;javax.net.ssl.SSLException identityError=null;
+        String chosen=null;JSONObject beat=null;javax.net.ssl.SSLException identityError=null;boolean refusedByPc=false;
         // Only read-only probes may fail over. The actual command is sent once.
         for(String host:hosts){
             if(android.os.SystemClock.elapsedRealtime()>=deadline)break;
             try{beat=heartbeat(pc,host);chosen=host;break;}
             catch(javax.net.ssl.SSLException e){identityError=e;}
-            catch(java.io.IOException e){stillSelected(pc);}
+            catch(java.io.IOException e){
+                // Loopback only exists through USB; a refusal there says nothing about the PC.
+                if(!host.startsWith("127.")&&refused(e))refusedByPc=true;
+                stillSelected(pc);
+            }
         }
         boolean discover=false;
         synchronized(LOCK){
@@ -144,13 +206,13 @@ final class Connections {
                 String host;try{host=MainActivity.validHost(candidate.optString("host"));}catch(Exception invalid){continue;}
                 try{beat=heartbeat(pc,host);chosen=host;SupportReports.record(context,"rediscovery","verified",null);break;}
                 catch(javax.net.ssl.SSLException e){identityError=e;}
-                catch(java.io.IOException e){stillSelected(pc);}
+                catch(java.io.IOException e){if(refused(e))refusedByPc=true;stillSelected(pc);}
             }
         }
         stillSelected(pc);
         if(chosen==null){
-            if(identityError!=null)throw new javax.net.ssl.SSLHandshakeException("Una dirección respondió con otra identidad. Conservé tu vinculación; revisa Eddy Deck en Windows. No se enviaron órdenes a esa PC.");
-            throw new java.net.ConnectException("Esperando a "+pc.optString("name","tu PC")+". Reconectaré automáticamente. La PC debe estar encendida; fuera de casa, Tailscale debe estar conectado en ambos equipos.");
+            if(identityError!=null)throw new javax.net.ssl.SSLHandshakeException("Respondió otra copia de Eddy Deck con una identidad distinta (por ejemplo, una versión antigua). En la PC cierra esa copia y abre el acceso «Eddy Deck» del escritorio. Conservé tu vinculación y no se enviaron órdenes.");
+            throw diagnose(pc,refusedByPc,deadline+3500);
         }
         remember(pc,chosen,beat);
         if(path.equals("/api/heartbeat")&&method.equals("GET"))return beat;

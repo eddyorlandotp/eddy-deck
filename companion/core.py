@@ -13,7 +13,7 @@ from companion.layout import Windows, monitors, validate_layout, resolve_monitor
 from companion.jobs import Journal, Queue, ReceiptError
 from companion.network import interface_addresses
 
-VERSION='2.2.9-beta.11'
+VERSION='2.2.11-beta.13'
 PORT=47990
 LOCAL_PORT=47989
 DISCOVERY_PORT=47991
@@ -202,7 +202,7 @@ class Deck:
         from companion.supervisor import active
         with self.lock:
             apps=copy.deepcopy(self.apps); profile=copy.deepcopy(self.profile)
-            result={'version':VERSION,'protocolVersion':2,'capabilities':{'windowControls':True,'launchForeground':True,'fileRepair':True,'queuePause':True,'mediaSessions':True},'name':socket.gethostname(),'connected':True,'profile':profile,
+            result={'version':VERSION,'protocolVersion':2,'capabilities':{'windowControls':True,'launchForeground':True,'fileRepair':True,'queuePause':True,'mediaSessions':True,'audioOutputs':True,'wakeOnLan':True},'name':socket.gethostname(),'connected':True,'profile':profile,
                     'apps':apps,'scanned':self.scanned,'scanning':self.scanning,'warnings':self.warnings,
                     'events':list(self.events),'pending':self.pending_status(),'powerError':self.power_error,
                     'dryRun':self.dry_run,'addresses':self.addresses,'port':self.port,
@@ -211,6 +211,9 @@ class Deck:
                     'keepAwake':self.awake.status() if self.awake else {'active':False,'error':'','scope':'not-started','displayRequired':False}}
         try: result['media']=self.adapter.media_snapshot(apps)
         except Exception: result['media']={'aimp':False,'state':'unknown','label':'Reproductor de Windows'}
+        from companion import audio_output,wake
+        result['audio']=audio_output.snapshot() if not self.dry_run else {'outputs':[],'defaultId':'','volume':None,'mute':False,'available':False,'error':'Modo de prueba'}
+        result['wake']=wake.snapshot() if not self.dry_run else {'adapters':[],'error':'Modo de prueba'}
         result['displayWarning']=''
         try:result['monitors']=monitors()
         except Exception:result['monitors']=[];result['displayWarning']='Windows no pudo consultar las pantallas. La música y las aperturas sin diseño siguen disponibles.'
@@ -463,7 +466,7 @@ class Deck:
             if device!='local':raise APIError(403,'Cambia el inicio automático desde el panel de Windows.')
             if type(body.get('enabled'))!=bool:raise ValueError('Opción no válida.')
             from companion.desktop import configure_startup
-            configure_startup(body['enabled']);return {'status':'saved'}
+            configure_startup(body['enabled'],self.data);return {'status':'saved'}
         if path=='/api/media':
             windows.validate_media_action(body.get('action'),body.get('target','system'),body.get('value'))
             if self.dry_run: return {'status':'simulated','message':'Control simulado'}
@@ -471,6 +474,17 @@ class Deck:
             try:
                 if self.closed or self.repairing:raise APIError(409,'Eddy Deck está reiniciando. No se envió el control de música.')
                 return self.adapter.media(body.get('action'),body.get('target','system'),self.apps,body.get('value'))
+            finally:self.media_lock.release()
+        if path=='/api/audio':
+            from companion import audio_output
+            action=body.get('action');endpoint=body.get('endpoint');value=body.get('value');expected=body.get('expected','')
+            if action not in ('select','volume','mute'):raise ValueError('Control de sonido no válido.')
+            audio_output.validate(action,endpoint,value,expected)
+            if self.dry_run:return {'status':'simulated','message':'Sonido validado sin modificar Windows.'}
+            if not self.media_lock.acquire(timeout=2):raise APIError(409,'Otro control de sonido sigue en curso. Espera su resultado.')
+            try:
+                if self.closed or self.repairing:raise APIError(409,'Eddy Deck está reiniciando. No se cambió el sonido.')
+                return audio_output.control(action,endpoint,value,expected)
             finally:self.media_lock.release()
         if path=='/api/cards/save':
             app=self.find_app(body.get('appId'))
@@ -711,7 +725,7 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/state','/api/backup'):
                 self.authenticate()
                 return self.respond(200,self.server.deck.state() if path.endswith('state') else self.server.deck.export_profile())
-            files={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/extended.js':'extended.js','/beta2.js':'beta2.js','/pickers.js':'pickers.js','/manual.js':'manual.js','/styles.css':'styles.css','/icon.svg':'icon.svg'}
+            files={'/':'index.html','/index.html':'index.html','/audio.js':'audio.js','/app.js':'app.js','/extended.js':'extended.js','/beta2.js':'beta2.js','/pickers.js':'pickers.js','/manual.js':'manual.js','/styles.css':'styles.css','/icon.svg':'icon.svg'}
             if path not in files: raise APIError(404,'No encontrado.')
             filename=files[path]
             mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'}[Path(filename).suffix]

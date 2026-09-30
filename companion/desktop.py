@@ -15,16 +15,17 @@ def executable_command():
     if getattr(sys,'frozen',False): return [sys.executable]
     return [sys.executable,str(resource_root()/'run.py')]
 
-def configure_startup(enabled):
-    import pythoncom,win32com.client
-    path=Path(os.environ['APPDATA'])/'Microsoft/Windows/Start Menu/Programs/Startup/Eddy Deck.lnk'
+def configure_startup(enabled,data=None):
+    from companion import resilience
+    if data is not None and resilience.is_canonical_process():
+        # Installed copy: preference, shortcut and watchdog change together.
+        resilience.set_startup(data,enabled);return
+    path=resilience.startup_link()
+    if data is not None:resilience.write_preferences(data,startup=bool(enabled))
     if not enabled:
         path.unlink(missing_ok=True);return
-    pythoncom.CoInitialize()
-    try:
-        command=executable_command();shell=win32com.client.Dispatch('WScript.Shell');link=shell.CreateShortcut(str(path))
-        link.TargetPath=command[0];link.Arguments=subprocess.list2cmdline(command[1:]+['--tray']);link.WorkingDirectory=str(Path(command[0]).parent);link.Save()
-    finally:link=None;shell=None;pythoncom.CoUninitialize()
+    command=executable_command()
+    resilience.write_shortcut(path,command[0],subprocess.list2cmdline(command[1:]+['--tray']))
 
 class Desktop:
     def __init__(self,deck,hidden=False):
@@ -195,8 +196,8 @@ class Desktop:
     def set_startup(self):
         path=self.startup_path()
         try:
-            configure_startup(self.startup.get())
-        except OSError as exc:
+            configure_startup(self.startup.get(),self.deck.data)
+        except Exception as exc:
             self.startup.set(self.startup_exists()); messagebox.showerror('Inicio con Windows',str(exc))
     def wifi(self,internet=False):
         if not getattr(sys,'frozen',False):
@@ -206,6 +207,10 @@ class Desktop:
         result=ctypes.windll.shell32.ShellExecuteW(None,'runas',sys.executable,'--enable-internet' if internet else '--enable-wifi',None,0)
         if result<=32: messagebox.showinfo('Wi-Fi','La regla no se pudo crear o cancelaste el aviso. El modo USB sigue disponible.')
     def quit(self):
+        # Record the choice before stopping so the watchdog respects it even if
+        # the supervisor cannot observe the exit code.
+        from companion.resilience import mark_user_exit
+        mark_user_exit(self.deck.data)
         self.cancel_power(); self.tray.stop()
         threading.Thread(target=self.deck.close,daemon=True).start(); self.root.destroy()
     def run(self): self.root.mainloop()
@@ -315,6 +320,10 @@ def run_started_receiver(args,data,deck):
         except KeyboardInterrupt: pass
         return
     desktop=Desktop(deck,args.tray)
+    from companion import resilience
+    if resilience.is_canonical_process() and not args.dry_run:
+        from companion.diagnostics import record
+        threading.Thread(target=resilience.ensure,args=(data,record),daemon=True,name='EddyDeckSelfHeal').start()
     def activation():
         import socket
         with socket.socket() as server:

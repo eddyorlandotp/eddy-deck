@@ -1,4 +1,75 @@
-# Validación · Eddy Deck 2.2.9-beta.11
+# Validación de beta 13 · 2.2.11-beta.13
+
+Alcance nuevo: salidas de sonido, volumen absoluto y encendido LAN desde Android. Los resultados de beta 12 y anteriores que aparecen debajo son históricos. Los informes `beta13-*` se generan con las fuentes y los binarios de esta entrega; no se reciclan como pruebas nuevas los de otras versiones.
+
+- Audio real: cinco salidas de Windows, selección de Console/Multimedia, volumen/silencio leídos por observador independiente; restauración del sonido y conservación de Communications.
+- Interfaz simulada: barra de Inicio/Música, envío al soltar, coalescencia, cambio de PC, salida desconectada, menú visual y botón de encendido sin receptor.
+- Android: paquete mágico, rechazo de direcciones, subredes y PC obsoleta; almacenamiento por identidad dentro del almacén cifrado. Ver informe instrumentado y comprobación visible del APK final.
+- No se ha apagado ni suspendido Windows para certificar el despertar físico. La emisión de la señal, el ajuste del controlador y una recepción UDP no prueban un arranque.
+- Claude: revisión pendiente por autenticación caducada, sin aprobación atribuida. Codex integra y verifica localmente.
+
+Consulta AUDIO-ENCENDIDO-BETA13.md y el manual separado para compatibilidad y uso. La publicación exige informes actuales, integridad instalada, APK final y copias verificadas.
+
+---
+
+# Validación · Eddy Deck 2.2.10-beta.12
+
+## Beta 12: conexión que se repara sola
+
+Esta versión responde a un incidente real: Defender puso Eddy Deck en cuarentena y un acceso directo saltó a una copia antigua con otra identidad. El análisis y el diseño están en [RESILIENCIA-BETA12.md](RESILIENCIA-BETA12.md).
+
+Pruebas de esta entrega (los resultados exactos están en los informes `beta12-*` de `.build`):
+
+- **Python:** 269 pruebas en total, 25 de ellas nuevas en `tests/test_resilience.py`. Incluyen:
+  - la reproducción del salto del acceso directo: el acceso antiguo resuelve a `EddyDeck-previous-*` y el nuevo no;
+  - la desactivación de copias anteriores, también con una copia en uso;
+  - el orden de versiones, idéntico al del comprobador C#;
+  - la preferencia de inicio que sobrevive al borrado del acceso;
+  - la salida intencional limitada a la sesión de Windows;
+  - la autorreparación con pasos independientes;
+  - el rechazo de un comprobador distinto al instalado;
+  - la redirección de copias antiguas;
+  - las causas registradas por el supervisor y su umbral de 45 s.
+- **C#:** la tabla de decisiones del vigilante (`tests/WatchdogChecks.cs`), compilada con `Watchdog.cs`.
+- **Android:** 70 aserciones instrumentadas en el Samsung, 7 de ellas nuevas. Cubren:
+  - PC encendida con el receptor caído;
+  - rechazo desde la PC sin ping adicional;
+  - un rechazo en loopback que no afirma que la PC esté encendida;
+  - Tailscale apagado;
+  - otra identidad;
+  - la identidad guardada, que nunca cambia.
+
+  Las pruebas con transporte simulado no envían paquetes.
+- **Instalación real sobre beta 11:**
+  - Se conservaron `deck.json`, `devices.json`, `server.crt` y `server.key` (hash idéntico) y la vinculación del celular.
+  - La tarea del vigilante quedó registrada con nivel limitado.
+  - 27 copias anteriores quedaron desactivadas.
+  - Defender no registró detecciones nuevas.
+- **Supervisión real:**
+  - 10 minutos de sondeo por segundo sin anomalías (latencia máxima de `/health`, 0,03 s; latido máximo, 1,5 s).
+  - Primer arranque tras instalar, con el vigilante registrándose en ese momento: 5 minutos sin anomalías después de los primeros 5 s de arranque (latido máximo, 1,6 s). El registro del vigilante no bloquea la interfaz.
+- **Pruebas reales de punta a punta en esta PC y el Samsung:**
+  1. **Receptor terminado de forma abrupta** (como un antivirus o un fallo): el vigilante lo reabrió y `/health` volvió en 6,4 s.
+  2. **Salida intencional:** el vigilante registró `user-exit` y no abrió nada.
+  3. **Diagnóstico en el celular con el receptor detenido:**
+     - con la app ya conectada, el aviso superior mostró "está encendida y responde, pero Eddy Deck no está abierto" y el indicador pasó a "Sin conexión";
+     - al abrir la app desde cero, la pantalla de reconexión mostró la misma causa.
+  4. **Ejecutable ausente** (cuarentena simulada renombrándolo): el vigilante registró `missing`, mostró el aviso y no reinstaló nada. Después se restauró el archivo.
+  5. **Recuperación:** tras reinstalar, el celular reconectó con la misma huella.
+
+Pendiente:
+
+- Un bloqueo intermitente previo, que la beta 11 registró 67 veces sin causa, todavía no se ha observado con el nuevo registro de causa.
+- La revisión independiente de Codex: no hubo cuota disponible durante esta entrega (se reanuda a partir del 23/09, 17:27). Se hizo una autorrevisión que corrigió cuatro defectos antes de entregar:
+  - la marca de salida por código 0;
+  - la reactivación de una tarea desactivada por el usuario;
+  - los avisos tras una desinstalación;
+  - la causa que no se mostraba porque `extended.js` sustituye `load()`.
+- La firma Authenticode.
+- El reporte de falso positivo a Microsoft, que requiere la cuenta del usuario.
+- Un reinicio completo de Windows con el disparador de inicio de sesión del vigilante.
+
+## Beta 11
 
 Xbox registra un identificador para abrirse y otro para su ventana. Se añadió la correspondencia exacta, comprobada en su manifiesto instalado, sin asociar otras aplicaciones o widgets de ese paquete.
 

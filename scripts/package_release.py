@@ -15,6 +15,7 @@ def main():
     sources.append(ROOT/'scripts/publish_desktop.py')
     sources.append(ROOT/'scripts/build_tidal.py')
     sources.append(ROOT/'scripts/build_media.py')
+    sources.append(ROOT/'scripts/build_audio.py')
     sources.append(ROOT/'scripts/build_update_manifest.py')
     sources.extend(ROOT/'scripts'/name for name in ('sign_release.py','build_checker.py','build_manual.py','package_evidence.py','verify_report_privacy.py','capture_build_environment.py'))
     source_zip=OUT/'EddyDeck-Codigo.zip'
